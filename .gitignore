@@ -1,0 +1,92 @@
+# =========================
+# Python core
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions / compiled libs
+*.so
+*.pyd
+*.dll
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+venv/
+env/
+ENV/
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# FastAPI / ASGI / runtime
+# =========================
+*.log
+logs/
+uvicorn.log
+gunicorn.log
+
+# =========================
+# Packaging / builds
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Testing / coverage
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# =========================
+# Type checking / linting
+# =========================
+.mypy_cache/
+.pyre/
+.ruff_cache/
+
+# =========================
+# Jupyter (if used for LSL data analysis)
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# IDE / editor
+# =========================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =========================
+# pylsl specific (LSL streams / binaries)
+# =========================
+*.xdf           # recorded LSL data files
+*.xdfz
+*.log           # stream logs
+*.bin
+*.raw
+
+# =========================
+# WebSockets / temp data
+# =========================
+*.tmp
+*.temp
+tmp/
+temp/
+
+# =========================
+# Misc
+# =========================
+.cache/
