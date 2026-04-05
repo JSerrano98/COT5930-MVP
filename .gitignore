@@ -4,8 +4,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions / compiled libs
 *.so
 *.pyd
 *.dll
@@ -30,8 +28,6 @@ ENV/
 # =========================
 *.log
 logs/
-uvicorn.log
-gunicorn.log
 
 # =========================
 # Packaging / builds
@@ -57,7 +53,7 @@ htmlcov/
 .ruff_cache/
 
 # =========================
-# Jupyter (if used for LSL data analysis)
+# Jupyter
 # =========================
 .ipynb_checkpoints/
 
@@ -70,23 +66,30 @@ htmlcov/
 *.sublime-workspace
 
 # =========================
-# pylsl specific (LSL streams / binaries)
+# Session data / recordings
 # =========================
-*.xdf           # recorded LSL data files
+*.xdf
 *.xdfz
-*.log           # stream logs
-*.bin
-*.raw
+*.hdf5
+*.h5
+*.csv
+sessions/
 
 # =========================
-# WebSockets / temp data
+# Node / Electron (frontend)
+# =========================
+node_modules/
+package-lock.json
+out/
+release/
+
+# =========================
+# Misc
 # =========================
 *.tmp
 *.temp
 tmp/
 temp/
-
-# =========================
-# Misc
-# =========================
 .cache/
+.DS_Store
+Thumbs.db

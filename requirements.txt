@@ -1,0 +1,8 @@
+# ECHO Backend Dependencies
+pylsl>=1.16
+fastapi>=0.100
+fastapi[standard]
+uvicorn[standard]>=0.20
+websockets>=12.0
+numpy>=1.24
+scipy>=1.11
