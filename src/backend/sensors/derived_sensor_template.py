@@ -33,16 +33,18 @@ class MyDerivedSensor(DerivedSensor):  # ← rename this
         pass  # ← replace with your computation
 
 
-# ── To start the sensor (source must be running first) ──────
-#
-#   sensor = MyDerivedSensor(
-#       uid="",
-#       name="",
-#       type="",
-#       channels=0,
-#       sample_rate=0,
-#       source_name="",          ← must match source sensor's name exactly
-#       buffer_seconds=5.0,
-#       process_interval=1.0,
-#   )
-#   sensor.start()
+# ── To start the sensor (source must already be running) ────
+
+if __name__ == "__main__":
+    sensor = MyDerivedSensor(
+        uid="",              # ← unique ID for this instance
+        name="",             # ← human-readable name
+        type="",             # ← signal category: "HR", "EEG_Power", etc.
+        channels=0,          # ← how many numbers process() returns
+        sample_rate=0,       # ← output updates per second (Hz)
+        source_name="",      # ← must match source sensor's name exactly
+        buffer_seconds=5.0,
+        process_interval=1.0,
+    )
+
+    sensor.run()  # starts streaming, blocks until Ctrl+C

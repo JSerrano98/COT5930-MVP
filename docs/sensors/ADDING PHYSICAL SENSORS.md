@@ -138,15 +138,26 @@ class MyTCPDevice(PhysicalSensor):
 
 ## Starting the Sensor
 
+Standalone script — use `run()`:
+
 ```python
-sensor = MySerialDevice(
-    uid="device_001",
-    name="MyDevice",
-    type="ECG",
-    channels=3,
-    sample_rate=250,
-    port="/dev/ttyUSB0",
-)
-sensor.start()   # connect + begin streaming
-sensor.stop()    # disconnect + stop
+if __name__ == "__main__":
+    sensor = MySerialDevice(
+        uid="device_001",
+        name="MyDevice",
+        type="ECG",
+        channels=3,
+        sample_rate=250,
+        port="/dev/ttyUSB0",
+    )
+    sensor.run()  # blocks until Ctrl+C
+```
+
+Inside a larger app — use `start()` / `stop()`:
+
+```python
+sensor = MySerialDevice(...)
+sensor.start()   # returns immediately, streams in background
+# ... later ...
+sensor.stop()    # stops streaming and disconnects
 ```

@@ -15,9 +15,8 @@ Most importantly allows the computed values to be recorded by LSL.
 
 import time
 import threading
-import logging
 import numpy as np
-from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_stream
+from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -79,12 +78,12 @@ class Sensor(ABC):
             
     def _create_outlet(self) -> StreamOutlet:
         info = StreamInfo(
-            self.uid,
-            self.name,
-            self.type,
-            self.channels,
-            self.sample_rate,
-            self.channel_format,
+            self.name,            # name
+            self.type,            # type
+            self.channels,        # channel_count
+            self.sample_rate,     # nominal_srate
+            self.channel_format,  # channel_format
+            self.uid,             # source_id
         )
 
         # Add channel labels to the stream info description
@@ -143,6 +142,19 @@ class Sensor(ABC):
         self._teardown()
         print(f"[{self.name}] Stopped")
 
+    def run(self):
+        """
+        Start the sensor and block until Ctrl+C.
+        Use this when running a sensor as a standalone script.
+        Use start() instead when running multiple sensors or inside a larger app.
+        """
+        self.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.stop()
+
     def push(self, sample: list[float]):
         """Push a single sample to the outlet."""
         if self._outlet:
@@ -161,8 +173,7 @@ class PhysicalSensor(Sensor):
     def connect(self):
         """
         Connect to the physical device and prepare for streaming.
-        This gets called once when the sensor starts. 
-        Do any setup work here (e.g. open serial port, connect to API, etc).
+        This gets called once when the sensor starts. Do any setup work here (e.g. open serial port, connect to API, etc).
         """
         ...
 
@@ -259,7 +270,7 @@ class DerivedSensor(Sensor):
     # Base class hooks
     def _setup(self):
         print(f"[{self.name}] Resolving source stream '{self.source_name}'...")
-        streams = resolve_stream('name', self.source_name)
+        streams = resolve_byprop('name', self.source_name, timeout=5.0)
 
         if self.source_type:
             streams = [s for s in streams if s.type() == self.source_type]
@@ -322,15 +333,15 @@ class DerivedSensor(Sensor):
 class DummySensor(Sensor):
     """
     Base class for fake/test sensors that generate synthetic data.
- 
+
     Use this to test your pipeline, build frontend components, or troubleshoot
     without needing real hardware. Subclass this and implement generate_sample()
     to produce whatever fake data you need.
- 
+
     There is no device to connect to. The sensor just generates data and
     pushes it at the declared sample rate.
     """
- 
+
     @abstractmethod
     def generate_sample(self) -> list[float]:
         """
@@ -339,11 +350,12 @@ class DummySensor(Sensor):
         This should always return data — dummy sensors never have "no data available".
         """
         ...
- 
+
     # Base class hooks
+
     def _setup(self):
         print(f"[{self.name}] Starting dummy sensor...")
- 
+
     def _loop_body(self):
         sample = self.generate_sample()
         self.push(sample)

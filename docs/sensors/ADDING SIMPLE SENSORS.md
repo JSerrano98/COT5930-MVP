@@ -18,6 +18,16 @@ echo/src/backend/sensors/
 
 ---
 
+## run() vs start()
+
+Every sensor has two ways to launch it.
+
+`sensor.run()` starts the sensor **and blocks** until you press Ctrl+C. Use this when running a sensor by itself as a standalone script.
+
+`sensor.start()` starts the sensor **in the background** and returns immediately. Use this when starting multiple sensors from the same script, or when launching sensors from inside a larger app like the session manager. If you use `start()` in a standalone script, the script will exit immediately and the sensor will die — so use `run()` instead.
+
+---
+
 ## Dummy Sensors
 
 A dummy sensor generates fake data. Use it to test the pipeline, build frontend components, or troubleshoot without needing real hardware.
@@ -50,22 +60,27 @@ class FakeECG(DummySensor):
         beat = np.exp(-((self._t % 0.833 - 0.1) ** 2) / 0.001)
         noise = random.gauss(0, 0.05)
         return [float(beat + noise)]
+
+
+if __name__ == "__main__":
+    ecg = FakeECG(
+        uid="fake_ecg_001",
+        name="FakeECG",
+        type="ECG",
+        channels=1,
+        sample_rate=250,
+    )
+    ecg.run()
 ```
 
-Start it:
+Run it:
 
-```python
-ecg = FakeECG(
-    uid="fake_ecg_001",
-    name="FakeECG",
-    type="ECG",
-    channels=1,
-    sample_rate=250,
-)
-ecg.start()
+```bash
+cd echo/src/backend
+python -m sensors.dummy.fake_ecg
 ```
 
-Now `"FakeECG"` is a real stream on the network. Your FastAPI server, LabRecorder, or any derived sensor can see it and read from it.
+Now `"FakeECG"` is a live stream on the network. Your session manager, LabRecorder, or any derived sensor can see it and read from it. Press Ctrl+C to stop.
 
 ---
 
@@ -116,22 +131,47 @@ class HeartRate(DerivedSensor):
         intervals = np.diff(crossings) / self.source_rate
         bpm = 60.0 / intervals.mean()
         return [float(bpm)]
+
+
+if __name__ == "__main__":
+    hr = HeartRate(
+        uid="hr_001",
+        name="HeartRate",
+        type="HR",
+        channels=1,
+        sample_rate=1,
+        source_name="FakeECG",       # must match the source sensor's name exactly
+        buffer_seconds=5.0,
+        process_interval=1.0,
+    )
+    hr.run()
 ```
 
-Start it (the source sensor must already be running):
+Run the source sensor first in one terminal, then this in another:
+
+```bash
+python -m sensors.derived.heart_rate
+```
+
+### Starting multiple sensors from one script
+
+If you want to launch several sensors together, use `start()` for each and `run()` on the last one (or add your own keep-alive loop):
 
 ```python
-hr = HeartRate(
-    uid="hr_001",
-    name="HeartRate",
-    type="HR",
-    channels=1,
-    sample_rate=1,
-    source_name="FakeECG",       # must match the source sensor's name exactly
-    buffer_seconds=5.0,
-    process_interval=1.0,
-)
-hr.start()
+ecg = FakeECG(uid="ecg_001", name="FakeECG", type="ECG", channels=1, sample_rate=250)
+eeg = FakeEEG(uid="eeg_001", name="FakeEEG", type="EEG", channels=4, sample_rate=256)
+
+ecg.start()   # background, returns immediately
+eeg.start()   # background, returns immediately
+
+# Block until Ctrl+C, then clean up
+import time
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    ecg.stop()
+    eeg.stop()
 ```
 
 ---
@@ -164,4 +204,8 @@ Derived sensors also need:
 
 **Wrong number of values** — Your function returned a list with a different length than `channels`. They must match exactly.
 
-**Nothing happens** — You forgot to call `.start()`. Creating the object doesn't start streaming.
+**Nothing happens** — You forgot to call `.run()` or `.start()`. Creating the object doesn't start streaming.
+
+**Sensor dies immediately** — You used `start()` in a standalone script. Use `run()` instead — it keeps the script alive until Ctrl+C.
+
+**ModuleNotFoundError** — Run from the `backend/` folder with `python -m sensors.dummy.your_file`, not from inside the `dummy/` folder directly.

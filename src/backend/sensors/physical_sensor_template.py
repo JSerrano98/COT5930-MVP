@@ -43,12 +43,14 @@ class MyPhysicalSensor(PhysicalSensor):  # ← rename this
 
 
 # ── To start the sensor ─────────────────────────────────────
-#
-#   sensor = MyPhysicalSensor(
-#       uid="",
-#       name="",
-#       type="",
-#       channels=0,
-#       sample_rate=0,
-#   )
-#   sensor.start()
+
+if __name__ == "__main__":
+    sensor = MyPhysicalSensor(
+        uid="",              # ← unique ID for this instance
+        name="",             # ← human-readable name
+        type="",             # ← signal category: "ECG", "EEG", etc.
+        channels=0,          # ← how many numbers per sample
+        sample_rate=0,       # ← samples per second (Hz)
+    )
+
+    sensor.run()  # starts streaming, blocks until Ctrl+C
