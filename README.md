@@ -151,9 +151,3 @@ ECHO's streaming backbone is built on Lab Streaming Layer. Thank you to the LSL 
 ```
 
 </details>
-
----
-
-## License
-
-Internal — USAARL / FAU
