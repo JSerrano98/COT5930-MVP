@@ -17,6 +17,85 @@
   }
 }
 
+.Input-Select {
+  height: 40px;
+  width: 60px;
+  border-radius: 5px;
+  padding: 10px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+ 
+}
+
+
+.delete{
+  height: 25px;
+  width: 40px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 500;
+  color: red;
+  border-radius: 5px;
+  padding: 6px 20px;
+  transition: all 0.4s ease;
+  cursor: pointer;
+}
+.delete:hover {
+  color: white;
+  background-color: red;
+}
+
+.create-Element {
+  height: 25px;
+  width: 40px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: blue;
+  border-radius: 5px;
+  padding: 6px 20px;
+  margin-top: 20px;
+  transition: all 0.4s ease;
+  cursor: pointer;
+
+}
+
+.create-Element:hover {
+  color: white;
+  background-color: blue;
+}
+
+
+.container{
+  width: 80vw;
+  height: 80vh;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  background-color:ghostwhite;
+  padding: 80px 0;
+
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 35px;
+  padding: 5px 10px;
+  
+}
+
 .hero {
   position: relative;
 
@@ -92,6 +171,7 @@
   @media (max-width: 1024px) {
     flex-direction: column;
     text-align: center;
+
   }
 }
 

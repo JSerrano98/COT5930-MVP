@@ -10,8 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
+    "lodash.throttle": "^4.1.1",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.4",
+    "react-use-websocket": "^4.13.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
