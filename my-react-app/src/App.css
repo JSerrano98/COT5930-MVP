@@ -17,6 +17,19 @@
   }
 }
 
+.Dashboard-Box {
+  height: 80px;
+  max-width: 500px;
+  padding: 10px 10px;
+  display: flex;
+  border: 2px solid red ;
+  border-radius: 5px;
+  text-align: center;
+}
+.Input-Selector {
+  display: inline;
+}
+
 .Input-Select {
   height: 40px;
   width: 60px;

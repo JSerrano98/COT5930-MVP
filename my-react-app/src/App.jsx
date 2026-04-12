@@ -25,18 +25,21 @@ return(
   <>
      <div className='box'>
       {prompts.map(( prompt, i) => (
-        <div>
-    
-          <select name="prompt" defaultValue="orange">
-          <option value="orange">Orange</option>
-          <option value="apple">apple</option>
-          </select>
-          <textarea></textarea>
-         </div>
-       ))}
-      </div>
+        <div className='Dashboard-Box'>
+          <p>this is a test</p>
+          <div className='Input-Selector'>
+            
+            <select name="prompt" defaultValue="orange">
+            <option value="orange">Orange</option>
+            <option value="apple">apple</option>
+            </select>
+            <textarea></textarea>
+          </div>
+       
+        </div>
+      ))}
       <button onClick={handleAddField}>click me!</button>
-    
+      </div>
     
        {console.log(prompts)}
   </>
