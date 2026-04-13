@@ -13,21 +13,23 @@
 │                                                           │
 ╰───────────────────────────────────────────────────────────╯
 ```
-**Version:** 0.1.0 — LSL Streaming Prototype  
+**Version:** 0.1.1 — Monitoring Dashboard Beta  
 
-**Date:** 04/05/2026
+**Date:** 04/12/2026
 
-**Facilatator:** US Army Aeromedical Research Lab (USAARL) || Operator State Monitoring Team (OSM)
+**Facilitator:** US Army Aeromedical Research Lab (USAARL) || Operator State Monitoring Team (OSM)
 
-**Developer:** Florida Atlantic University (FAU) || Hacking for Defense Program (H4D) 
+**Developer:** Florida Atlantic University (FAU) || Hacking for Defense Program (H4D)
 
 ---
 
 ## Table of Contents
 
 - [About](#about)
+- [What's New in v0.1.1](#whats-new-in-v011)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
+- [Dashboard](#dashboard)
 - [Sensors](#sensors)
 - [Documentation](#documentation)
 - [Tech Stack](#tech-stack)
@@ -41,7 +43,28 @@ ECHO is a real-time platform for monitoring the cognitive state of operators. It
 
 The end goal of this platform is to provide the means to develop the groundwork for systems that aim to enhance operator state management, monitoring, prediction, and support.
 
-The current release is a barebones **LSL Streaming Prototype** — a working FastAPI server that acts as the session manager for research recordings via LSL, a sensor abstraction layer for standardized sensor development and integration, and WebSocket streaming for frontend visualization. The frontend is not yet implemented. It is planned to be developed with React.js using Tailwind.css and packaged with Electron.js for desktop use.
+---
+
+## What's New in v0.1.1
+
+This release introduces the **Monitoring Dashboard Beta** — the first working frontend for ECHO. Building on the LSL streaming backend from v0.1.0, this version adds a real-time visualization layer and several backend improvements.
+
+**Frontend — Monitoring Dashboard**
+- Live oscilloscope-style signal rendering via HTML5 Canvas with per-channel display
+- Add, remove, and resize monitor panels to build a custom monitoring layout
+- Multi-channel support with individual channel isolation or all-channels overlay view
+- Per-channel color coding with a built-in color picker (palette presets + custom hex)
+- Automatic stream discovery — monitors populate with all detected LSL streams
+- Live refresh to re-scan the network for new streams without restarting the session
+- Auto-reconnecting WebSocket connection with online/offline status indicator
+- Recording indicator UI (recording backend not yet implemented)
+- Navigation scaffolding for Settings, Machine Learning, and Data views (pages stubbed)
+
+**Backend**
+- `start_all_dummy.py` — single-command launcher that discovers and starts all dummy sensors with a `default()` classmethod
+- Alpha Band Power derived sensor — computes log-scaled alpha-band (8–12 Hz) power from a source EEG stream using Welch's method
+- Sensor templates directory (`sensors/templates/`) with ready-to-copy templates for dummy, derived, and physical sensors
+- Project structure reorganized from `src/` to `app/` with separate `backend/` and `frontend/` directories
 
 ---
 
@@ -49,19 +72,47 @@ The current release is a barebones **LSL Streaming Prototype** — a working Fas
 
 ```
 echo/
-├── src/
+├── app/
 │   ├── backend/
-│   │   ├── sensors/           # sensor class hierarchy + dummy/derived sensors
-│   │   ├── session.py         # FastAPI server, LSL discovery, WebSocket bridge
-│   │   └── test_monitor.py    # terminal WebSocket client for testing
-│   ├── electron/              # (planned) desktop packaging
-│   └── frontend/              # (planned) React + Tailwind dashboard
+│   │   ├── sensors/
+│   │   │   ├── sensor.py              # sensor class hierarchy (base, physical, derived, dummy, ML)
+│   │   │   ├── dummy/                 # fake sensors for testing
+│   │   │   │   ├── fake_ECG.py        # synthetic heartbeat signal
+│   │   │   │   ├── fake_eeg.py        # synthetic 8-channel EEG
+│   │   │   │   └── hi_low_signal.py   # simple square wave
+│   │   │   ├── derived/               # computed metrics from raw streams
+│   │   │   │   └── alpha_band_power.py # New! Computes log-scaled alpha power from EEG using Welch's method
+│   │   │   └── templates/             # copy-paste starters for new sensors
+│   │   │       ├── dummy_sensor_template.py
+│   │   │       ├── derived_sensor_template.py
+│   │   │       └── physical_sensor_template.py
+│   │   ├── session.py                 # FastAPI server, LSL discovery, WebSocket bridge
+│   │   ├── start_all_dummy.py         # launch all dummy sensors in one process
+│   │   ├── test_monitor.py            # terminal WebSocket client for testing (redundandt with frontend but useful for quick backend tests)
+│   │   └── requirements.txt
+│   │
+│   └── frontend/                      # React + Tailwind dashboard (Vite)
+│       ├── src/
+│       │   ├── main.jsx               # app entry point
+│       │   ├── App.jsx                # router and layout
+│       │   ├── App.css                # global styles (Lexend font, Tailwind import thats it really :3 ) 
+│       │   └── assets/
+│       │       ├── components/
+│       │       │   └──  Navbar.jsx     # sidebar navigation
+│       │       └── views/
+│       │           ├── Dashboard.jsx  # main monitoring view
+│       │           ├── Settings.jsx   # (stubbed)
+│       │           ├── MachineLearning.jsx  # (stubbed)
+│       │           └── Data.jsx       # (stubbed)
+│       ├── package.json
+│       ├── vite.config.js
+│       └── index.html
 │
 ├── docs/
-│   ├── sensors/               # guides for adding new sensors
+│   ├── sensors/
+│   │   ├── ADDING SIMPLE SENSORS.md
+│   │   └── ADDING PHYSICAL SENSORS.md
 │   └── software specifications/
-│
-├── requirements.txt
 └── README.md
 ```
 
@@ -69,24 +120,69 @@ echo/
 
 ## Quick Start
 
-```bash
-# install dependencies
-pip install -r requirements.txt
+### 1. Start the Backend
 
-# terminal 1 — start a dummy sensor
-cd src/backend
-python -m sensors.dummy.fake_ecg
+```bash
+# install backend dependencies
+pip install -r app/backend/requirements.txt
+
+# terminal 1 — start all dummy sensors at once
+cd app/backend
+python start_all_dummy.py
 
 # terminal 2 — start the session manager
-cd src/backend
+cd app/backend
 python session.py
+```
 
-# terminal 3 — watch live data
-cd src/backend
+### 2. Start the Frontend
+
+```bash
+# install frontend dependencies
+cd app/frontend
+npm install
+
+# terminal 3 — start the dev server
+npm run dev
+```
+
+Open the URL printed by Vite (typically `http://localhost:5173`). The dashboard will auto-connect to the session manager's WebSocket at `ws://localhost:8000/ws`.
+
+### 3. Monitor Signals
+
+1. Click **Add Monitor** to create a monitor panel
+2. Select a stream from the dropdown (e.g. `FakeECG`, `FakeEEG`)
+3. For multi-channel streams, use the channel dropdown to isolate individual channels or view all overlaid
+4. Drag the bottom-right corner to resize any panel
+5. Click **Refresh** to re-scan the network if you start new sensors
+
+### Alternative: Terminal-Only Testing
+
+If you just want to verify the backend without the frontend:
+
+```bash
+# terminal 3 — watch raw data in the terminal
+cd app/backend
 python test_monitor.py
 ```
 
-To use hardware with built in LSL support, just open your sensor's LSL app and start streaming before launching the session manager. ECHO discovers any LSL stream on the network automatically.
+### Using Real Hardware
+
+For devices with built-in LSL support, open your sensor's LSL app and start streaming before launching the session manager. ECHO discovers any LSL stream on the network automatically. Click **Refresh** in the dashboard to pick up new streams without restarting.
+
+---
+
+## Dashboard
+
+The monitoring dashboard is an oscilloscope-style interface for viewing live sensor streams.
+
+**Monitor Panels** — Each panel connects to a single LSL stream and renders its data in real time on a dark canvas. Panels are independently resizable with a minimum size of 320×220px. Add as many as you need and arrange them freely.
+
+**Multi-Channel Display** — Streams with multiple channels (like the 8-channel FakeEEG) can be viewed as an overlay of all channels with automatic color coding per channel, or you can isolate a single channel via the channel dropdown. A legend in the top-right of the canvas shows channel labels and current values.
+
+**Auto-Scaling** — The Y-axis smoothly adapts to the signal's amplitude range with a dampened scaling algorithm that prevents jitter while still tracking amplitude changes.
+
+**Connection Management** — The dashboard auto-connects to the session manager on load and reconnects automatically if the connection drops. The status indicator in the top bar shows online/offline state.
 
 ---
 
@@ -96,9 +192,27 @@ ECHO uses a class hierarchy to treat all data sources uniformly as LSL streams:
 
 | Type | Purpose | Example |
 |------|---------|---------|
-| **DummySensor** | Fake data for testing | `FakeECG`, `HiLowSensor` |
+| **DummySensor** | Fake data for testing | `FakeECG`, `FakeEEG`, `HiLowSensor` |
 | **PhysicalSensor** | Wraps non-LSL hardware (serial, BLE, TCP) | Custom device adapters |
-| **DerivedSensor** | Computes metrics from other streams | Heart rate from ECG |
+| **DerivedSensor** | Computes metrics from other streams | `AlphaBandPower` |
+| **MLSensor** | Applies pre-trained models to buffers | *(planned)* |
+
+### Launching Dummy Sensors
+
+You can run individual sensors as standalone scripts or launch all of them at once:
+
+```bash
+# all at once (recommended for testing)
+cd app/backend
+python start_all_dummy.py
+
+# or individually
+python -m sensors.dummy.fake_ECG
+python -m sensors.dummy.fake_eeg
+python -m sensors.dummy.hi_low_signal
+```
+
+To make your dummy sensor auto-launchable by `start_all_dummy.py`, add a `default()` classmethod that returns a pre-configured instance.
 
 See the guides in `docs/sensors/` for how to add your own.
 
@@ -108,8 +222,8 @@ See the guides in `docs/sensors/` for how to add your own.
 
 | Document | Description |
 |----------|-------------|
-| [Adding Simple Sensors](docs/sensors/ADDING_SIMPLE_SENSORS.md) | Guide for dummy and derived sensors |
-| [Adding Physical Sensors](docs/sensors/ADDING_PHYSICAL_SENSORS.md) | Guide for wrapping real hardware |
+| [Adding Simple Sensors](docs/sensors/ADDING%20SIMPLE%20SENSORS.md) | Guide for dummy and derived sensors |
+| [Adding Physical Sensors](docs/sensors/ADDING%20PHYSICAL%20SENSORS.md) | Guide for wrapping real hardware |
 | [Technical Specification](docs/software%20specifications/technical-specification.md) | Full system architecture and API contracts |
 | [Simplified Specification](docs/software%20specifications/simplified-specification.md) | Plain-English overview for researchers |
 
@@ -120,15 +234,17 @@ See the guides in `docs/sensors/` for how to add your own.
 | Component | Technology |
 |-----------|------------|
 | Streaming | Lab Streaming Layer (`pylsl`) |
-| Backend | Python 3.11+, FastAPI |
+| Backend | Python 3.11+, FastAPI, Uvicorn |
 | Signal Processing | NumPy, SciPy |
-| Frontend *(planned)* | React, Tailwind, Electron |
+| Frontend | React 19, Tailwind CSS 4, Vite |
+| Visualization | HTML5 Canvas (custom oscilloscope renderer) |
+| Packaging *(planned)* | Electron |
 
 ---
 
 ## References
 
-ECHO's streaming backbone is built on Lab Streaming Layer. Thank you to the LSL team for an amazing tool. 
+ECHO's streaming backbone is built on Lab Streaming Layer. Thank you to the LSL team for an amazing tool.
 
 > Kothe, C., Shirazi, S. Y., Stenner, T., Medine, D., Boulay, C., Grivich, M. I., Artoni, F., Mullen, T., Delorme, A., & Makeig, S. (2025). The Lab Streaming Layer for Synchronized Multimodal Recording. *Imaging Neuroscience*, 3, IMAG.a.136. https://doi.org/10.1162/IMAG.a.136
 

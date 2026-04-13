@@ -4,9 +4,10 @@ const WS_URL = 'ws://localhost:8000/ws';
 const API_URL = 'http://localhost:8000';
 
 const SIGNAL_COLORS = [
-  '#2563eb', '#059669', '#dc2626', '#d97706',
-  '#7c3aed', '#0891b2', '#be185d', '#4f46e5',
-  '#0d9488', '#ea580c', '#6d28d9', '#475569',
+// chill easy to look at color pallet on dark backgrounds, with good contrast and variety for multiple channels
+  '#2563eb', '#07dd96', '#ef4444', '#f5e50b',
+  '#8b5cf6', '#59dff7', '#ec4899', '#8de40a',
+  '#ff6a00', '#4f9bf1', '#14b8a6', '#e11d48',
 ];
 
 const MIN_W = 320;
