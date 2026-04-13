@@ -4,13 +4,12 @@ Dummy Sensor Template
 Copy this file into the dummy/ folder and rename it.
 Rename the class, then fill in generate_sample() with your fake data.
 """
-
 from dataclasses import dataclass
-from app.backend.sensors.sensor import DummySensor
+from sensors.sensor import DummySensor
 
 
 @dataclass
-class HiLowSensor(DummySensor):  # ← rename this
+class HiLowSensor(DummySensor):
     """
     Oscillates between two values to create a "hi/low" signal for testing.
      - This is a simple example of a dummy sensor that generates a square wave.
@@ -18,6 +17,16 @@ class HiLowSensor(DummySensor):  # ← rename this
     """
        
     _clock: int = 0
+
+    @classmethod
+    def default(cls):
+        return cls(
+            uid="hi_low_001",
+            name="HI_LOW",
+            type="Dummy",
+            channels=1,
+            sample_rate=200,
+        )
 
     def generate_sample(self) -> list[float]:
         """
@@ -32,12 +41,5 @@ class HiLowSensor(DummySensor):  # ← rename this
             return [0.0]  # "LOW" value
 
 if __name__ == "__main__":
-    sensor = HiLowSensor(
-        uid="hi_low_001",              # ← unique ID for this instance
-        name="HI_LOW",             # ← human-readable name
-        type="Dummy",             # ← signal category: "ECG", "EEG", etc.
-        channels=1,          # ← how many numbers per sample
-        sample_rate=200,       # ← samples per second (Hz)
-    )
-
-    sensor.run()  # starts streaming, blocks until Ctrl+C
+    sensor = HiLowSensor.default()
+    sensor.run()
