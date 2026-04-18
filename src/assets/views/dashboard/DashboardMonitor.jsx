@@ -1,17 +1,19 @@
-const SIGNAL_COLORS = [
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+export const SIGNAL_COLORS = [
   '#2563eb', '#07dd96', '#ef4444', '#f5e50b',
   '#8b5cf6', '#59dff7', '#ec4899', '#8de40a',
   '#ff6a00', '#4f9bf1', '#14b8a6', '#e11d48',
 ];
 
-const MIN_W = '20%';
-const MIN_H = '30%';
+const MIN_W = 200;
+const MIN_H = 180;
 
 let _id = 0;
 const uid = () => `mon_${++_id}_${Date.now()}`;
 
 
-const  DashboardMonitor = ({ channels, width, height, maxPoints = 500 }) => {
+const SignalCanvas = ({ channels, width, height, maxPoints = 500 }) => {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const channelsRef = useRef(channels);
@@ -341,7 +343,7 @@ const MonitorPanel = ({ id, streams, dataRef, onRemove, defaultColor }) => {
 
       setChannelData(visible.map((i) => ({
         label: channelLabels[i] || `Channel ${i + 1}`,
-        color: visible.length === 1 ? color : CHANNEL_COLORS[i % CHANNEL_COLORS.length],
+          color: visible.length === 1 ? color : SIGNAL_COLORS[i % SIGNAL_COLORS.length],
         data: [...(buffersRef.current[i] || [])],
       })));
     }, 33);
