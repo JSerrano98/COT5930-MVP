@@ -1,7 +1,9 @@
-import { useState } from 'react';
 import Toggle from '../../components/ToggleSwitch';
+import { useDevMode } from '../../context/DevModeContext';
 
-const Settings = ({ devMode, setDevMode }) => {
+const Settings = () => {
+  const { devMode, setDevMode } = useDevMode();
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Settings</h1>
@@ -12,4 +14,5 @@ const Settings = ({ devMode, setDevMode }) => {
     </div>
   );
 };
+
 export default Settings;
