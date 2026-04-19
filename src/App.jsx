@@ -1,5 +1,7 @@
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { DevModeProvider } from './assets/context/DevModeContext';
+import { AlertProvider } from './assets/context/AlertContext';
+import AlertOverlay from './assets/components/AlertOverlay';
 
 import Navbar from './assets/components/Navbar';
 import Dashboard from './assets/views/dashboard/Dashboard';
@@ -37,7 +39,10 @@ const AppLayout = () => {
 const App = () => (
   <HashRouter>
     <DevModeProvider>
-      <AppLayout />
+      <AlertProvider>
+        <AlertOverlay />
+        <AppLayout />
+      </AlertProvider>
     </DevModeProvider>
   </HashRouter>
 );
