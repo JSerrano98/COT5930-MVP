@@ -76,8 +76,16 @@ class SessionManager:
             inlet = StreamInlet(info, max_buflen=1)
             inlet.open_stream()
 
+            # inlet.info() fetches the full stream description from the publisher,
+            # including channel labels written by the sensor. The StreamInfo from
+            # resolve_streams() only carries basic metadata without the desc tree.
+            try:
+                full_info = inlet.info(timeout=3.0)
+            except Exception:
+                full_info = info
+
             channel_labels = []
-            ch = info.desc().child("channels").child("channel")
+            ch = full_info.desc().child("channels").child("channel")
             while not ch.empty():
                 label = ch.child_value("label")
                 if label:

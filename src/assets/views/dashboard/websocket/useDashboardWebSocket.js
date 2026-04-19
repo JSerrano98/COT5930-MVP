@@ -45,6 +45,7 @@ export const useDashboardWebSocket = () => {
       ws.onmessage = (evt) => {
         try {
           const pkt = JSON.parse(evt.data);
+          pkt.receiveTime = Date.now();
           const name = pkt.stream;
           if (!dataRef.current[name]) dataRef.current[name] = [];
           dataRef.current[name].push(pkt);
