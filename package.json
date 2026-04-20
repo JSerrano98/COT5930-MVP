@@ -1,0 +1,91 @@
+{
+  "name": "echo",
+  "version": "0.1.3",
+  "private": true,
+  "description": "",
+  "keywords": [
+    ""
+  ],
+  "homepage": "https://github.com/JSerrano98/COT5930-MVP#readme",
+  "bugs": {
+    "url": "https://github.com/JSerrano98/COT5930-MVP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JSerrano98/COT5930-MVP.git"
+  },
+  "license": "ISC",
+  "author": "Florida Atlantic University (FAU) - John Serrano & Dylan Liesenfelt",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "start": "cross-env NODE_ENV=development electron .",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\""
+  },
+  "build": {
+    "appId": "com.fau.cot5930mvp",
+    "productName": "ECHO",
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/session",
+        "to": "backend/session"
+      }
+    ],
+    "directories": {
+      "buildResources": "assets, public"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "chart.js": "^4.5.1",
+    "electron-builder": "^26.8.1",
+    "electron-bundler": "^0.0.0-alpha.0.0",
+    "lodash.throttle": "^4.1.1",
+    "react": "^19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.4",
+    "react-grid-layout": "^2.2.3",
+    "react-router-dom": "^7.14.1",
+    "react-use-websocket": "^4.13.0",
+    "reactflow": "^11.11.4",
+    "tailwindcss": "^4.2.2",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.2.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "vite": "^8.0.1",
+    "wait-on": "^9.0.5"
+  }
+}
