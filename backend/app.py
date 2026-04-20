@@ -12,6 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from dashboard.session_manager import SessionManager
+from machine_learning.router import router as ml_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 session = SessionManager()
@@ -29,6 +30,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(ml_router)
 
 # ════════════════════════════════════════════════════════════════════
 # INFO

@@ -54,7 +54,8 @@ function stopBackend() {
 // ─── Scripts ──────────────────────────────────────────────────────────────────
 
 const SCRIPTS = {
-  'Start All Dummy Sensors': path.join(backendDir, 'sensors', 'start_all_dummy.py'),
+  'Start All Sensors':       path.join(backendDir, 'sensors', 'start_all_sensors.py'),
+  'Start Dummy Sensors Only': path.join(backendDir, 'sensors', 'start_all_dummy.py'),
 }
 
 let scriptProcs = {}

@@ -13,7 +13,7 @@
 │                                                           │
 ╰───────────────────────────────────────────────────────────╯
 ```
-**Version:** 0.1.2 - Dashboard Enchancments
+**Version:** 0.1.3 - ML Pipeline Beta
 
 **Date:** 04/19/2026
 
@@ -26,6 +26,7 @@
 ## Table of Contents
 
 - [About](#about)
+- [What's New in v0.1.3](#whats-new-in-v013)
 - [What's New in v0.1.2](#whats-new-in-v012)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
@@ -42,6 +43,28 @@
 ECHO is a real-time platform for monitoring the cognitive state of operators. It connects to physiological sensors (EEG, ECG, eye tracking, etc.) via [Lab Streaming Layer (LSL)](https://labstreaminglayer.org), displays live data on a freeform canvas dashboard, and records everything for offline analysis. Future implementations include a machine learning training and development abstraction environment for quick, easy, and intuitive development of models for research testing.
 
 The end goal of this platform is to provide the means to develop the groundwork for systems that aim to enhance operator state management, monitoring, prediction, and support.
+
+---
+
+## What's New in v0.1.3
+
+This release introduces the ML Pipeline — a node-graph environment for building, training, and evaluating machine learning models on sensor data.
+
+**ML Pipeline — Node Graph**
+- Visual node graph editor (ComfyUI-style) for composing full ML pipelines
+- Nodes: Data Loader → Preprocess → Feature Extraction → Train/Test Split → Model → Trainer → Evaluator
+- Labeled input/output handles on left and right sides of each node
+- Ensemble (stacking) node — combine multiple trained models with a configurable meta-learner
+- Model selector covers Linear (Ridge, Lasso, ElasticNet), Classical (SVM, RF, GBT, KNN, LDA), and Neural (MLP, CNN1D, LSTM, EEGNet)
+- Backend pipeline executor with topological sort and multi-input support
+- Train and evaluate from within the canvas; results displayed inline on each node
+
+**Sensors — Physical Hardware Support**
+- `start_all_sensors.py` — unified launcher that discovers dummy, physical, and derived sensors
+- `sensors/physical/` package — drop-in location for physical hardware adapters
+- Arduino potentiometer sensor (`arduino_pot.py`) — reads ADC values over USB serial via pyserial
+- Auto-detects Arduino COM port by USB descriptor keywords (Arduino / CH340 / CP210x / FTDI)
+- `start_all_dummy.py` retained as a lightweight testing-only launcher
 
 ---
 
@@ -95,10 +118,13 @@ echo/
 │   │   └── session_manager.py         # LSL discovery, WebSocket broadcast, recording
 │   ├── sensors/
 │   │   ├── sensor.py                  # base class hierarchy (Physical, Derived, Dummy, ML)
+│   │   ├── start_all_sensors.py       # launch all sensors (dummy + physical + derived)
 │   │   ├── start_all_dummy.py         # launch all dummy sensors in one command
 │   │   ├── dummy/
 │   │   ├── derived/
+│   │   ├── physical/
 │   │   └── templates/
+│   ├── machine_learning/
 │   └── utils/
 │
 ├── src/                               # React + Tailwind frontend (Vite + Electron)
@@ -137,8 +163,11 @@ echo/
 # install backend dependencies
 pip install -r backend/requirements.txt
 
-# terminal 1 — start all dummy sensors at once
+# terminal 1 — start all sensors (dummy + physical)
 cd backend/sensors
+python start_all_sensors.py
+
+# or dummy sensors only
 python start_all_dummy.py
 
 # terminal 2 — start the session manager (FastAPI)
@@ -154,14 +183,17 @@ npm install
 
 # terminal 3 — start in browser (Vite only)
 npm run dev
+```
 
-# OR start as Electron desktop app
+### 3. Start the Desktop App (Electron + Vite)
+
+```bash
 npm run electron:dev
 ```
 
 Open the URL printed by Vite (typically `http://localhost:5173`). The dashboard will auto-connect to the session manager's WebSocket at `ws://localhost:8000/ws`.
 
-### 3. Monitor Signals
+### 4. Monitor Signals
 
 1. Click **Start Session** in the dashboard header
 2. In the left panel, find your streams — click **WAVE** or **STATS** to add a monitor
@@ -210,15 +242,18 @@ ECHO uses a class hierarchy to treat all data sources uniformly as LSL streams:
 | Type | Purpose | Example |
 |------|---------|---------|
 | **DummySensor** | Fake data for testing | `FakeECG`, `FakeEEG`, `HiLowSensor`, `TimerSignal` |
-| **PhysicalSensor** | Wraps non-LSL hardware (serial, BLE, TCP) | Custom device adapters |
+| **PhysicalSensor** | Wraps non-LSL hardware (serial, BLE, TCP) | `ArduinoPotentiometer` |
 | **DerivedSensor** | Computes metrics from other streams | `AlphaBandPower` |
 | **MLSensor** | Applies pre-trained models to buffers | *(planned)* |
 
-### Launching Dummy Sensors
+### Launching Sensors
 
 ```bash
-# all at once (recommended for testing)
+# all sensors — dummy + physical + derived (recommended)
 cd backend/sensors
+python start_all_sensors.py
+
+# dummy sensors only (no hardware required)
 python start_all_dummy.py
 
 # or individually
@@ -228,7 +263,7 @@ python -m sensors.dummy.hi_low_signal
 python -m sensors.dummy.timer_signal
 ```
 
-To make your dummy sensor auto-launchable by `start_all_dummy.py`, add a `default()` classmethod that returns a pre-configured instance.
+To make any sensor auto-discoverable by `start_all_sensors.py`, add a `default()` classmethod that returns a pre-configured instance. Physical sensor scripts go in `backend/sensors/physical/`.
 
 See the guides in `docs/sensors/` for how to add your own.
 
@@ -250,6 +285,8 @@ See the guides in `docs/sensors/` for how to add your own.
 | Streaming | Lab Streaming Layer (`pylsl`) |
 | Backend | Python 3.11+, FastAPI, Uvicorn |
 | Signal Processing | NumPy, SciPy |
+| Machine Learning | scikit-learn |
+| Hardware Serial | pyserial |
 | Frontend | React 19, Tailwind CSS 4, Vite |
 | Desktop Shell | Electron |
 | Canvas / Node Graph | ReactFlow |

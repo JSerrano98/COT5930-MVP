@@ -47,7 +47,7 @@ def discover_sensors() -> list[DummySensor]:
         try:
             mod = importlib.import_module(full_name)
         except Exception as e:
-            print(f"  ⚠  Could not import {full_name}: {e}")
+            print(f"  [!] Could not import {full_name}: {e}")
             continue
 
         for attr_name in dir(mod):
@@ -63,7 +63,7 @@ def discover_sensors() -> list[DummySensor]:
                         instance = obj.default()
                         found.append(instance)
                     except Exception as e:
-                        print(f"  ⚠  {obj.__name__}.default() failed: {e}")
+                        print(f"  [x] {obj.__name__}.default() failed: {e}")
                 else:
                     skipped.append(obj.__name__)
 
