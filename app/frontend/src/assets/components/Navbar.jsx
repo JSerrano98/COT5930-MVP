@@ -16,7 +16,7 @@ const Navbar = () => {
       {/* Nav Links */}
       <div className="flex flex-col gap-5">
         <NavLink to="/" className={linkClass}>Dashboard</NavLink>
-        <NavLink to="/ml" className={linkClass}>Machine Learning</NavLink>
+        <NavLink to="/machine-learning" className={linkClass}>Machine Learning</NavLink>
         <NavLink to="/data" className={linkClass}>Data</NavLink>
       </div>
       

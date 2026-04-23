@@ -7,7 +7,6 @@ import Data from './assets/views/Data';
 import React, { Component } from "react";
 
 
-
 const App = () => {
   return (
     <HashRouter>

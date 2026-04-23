@@ -36,7 +36,7 @@ def Excel_payload(timestamp,streamname, data ):
     wb.active.append([timestamp, streamname, data])
     last_row = wb.active.max_row
     wb.active.cell(row=last_row, column=3).number_format = '0.000000'
-    wb.save(create_path() + '/data3.xlsx')
+    wb.save(create_path() + '/data2.xlsx')
     return
 
 def discover_streams(timeout: float = 3.0) -> list[dict]:
