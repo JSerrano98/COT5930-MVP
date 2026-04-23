@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 
 
 
-const localhost = 'http://localhost:6969/'
+const BACKEND = 'http://localhost:8000';
 
 const renderdata = (filenames) =>{
    return(
-    <div>
+    <div className='p-3  items-center divide-y divide-dashed md:divide-solid'>
     {filenames.map((file) => (
       <div className='flex items-center space-x-3'>
       <button className='btn'>download</button>
       <div> {file} </div>
+      <hr />
       </div>
     ))}
     </div>
@@ -38,7 +39,7 @@ const Data = () => {
   //params.append(file)
   const encode = encodeURIComponent(file);
   try{
-  const response =await fetch(localhost + `ML?file=${encode}`);
+  const response =await fetch(BACKEND + `/ML?file=${encode}`);
   const result = await response.json();
   setHeaders(result);
   }
@@ -58,9 +59,9 @@ const Data = () => {
   useEffect(() => { 
     const fetchData = async () => {
     try{
-      const response = await fetch(localhost + 'CSV');
+      const response = await fetch(BACKEND + '/CSV');
       const json = await response.json();
-
+      console.log(json)
       setFilenames(json);
 
     }
@@ -78,7 +79,7 @@ const Data = () => {
   return (
     <>  
        
-        <div>{filenames ? renderdata(filenames) : 'No Excel files in Directory, please upload a file to continue'}</div>
+        <div className='btn'>{filenames ? renderdata(filenames) : 'No Excel files in Directory, please upload a file to continue'}</div>
         <div>
         {filenames && < select value={select} onChange={(e) => { setSelect(e.target.value)
            retrieveHeaders(e.target.value)}

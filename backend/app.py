@@ -21,6 +21,9 @@ from machine_learning.router import router as ml_router
 import os
 import pandas as pd
 
+
+STORAGE_PATH = './data/CSV'
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 session = SessionManager()
 
@@ -110,47 +113,41 @@ async def websocket_endpoint(ws: WebSocket):
         session.remove_client(ws)
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 
-
-
-
-# The folder you want to list
-STORAGE_PATH = './CSV'
-
-@app.get("/")
-def hello():
-    return "Hello, World!"
-
-@app.get('/CSV')
+@app.get('/CSV/')
 def list_files():
     # Get all file names in the directory
+    print('help')
     try:
         files = os.listdir(STORAGE_PATH)
-        return {"file_list": files}
+        return files
     except FileNotFoundError:
         return {"error": "Directory not found"}, 404
 
 
-@app.route('/ML/')
-async def read_user_item(path: str):
+@app.get('/ML/')
+async def read_user_item(file: str):
 ##seperate pd.read function from app.py later
+    print(file)
     try:
-        df = pd.read_csv(STORAGE_PATH + '/'  + path )
+        
+        df = pd.read_csv(STORAGE_PATH + '/'  + file )
         columns = df.columns.to_list()
         return columns
     except:
         print('test for multiple file types')
     try:
-        df = pd.read_excel(STORAGE_PATH + '/' + path)
+        df = pd.read_excel(STORAGE_PATH + '/' + file)
         columns = df.columns.to_list()
         return columns
     except:
-        print('this failed too boohoo')
         return {"error": "Invalid file type"}, 400
+    
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 

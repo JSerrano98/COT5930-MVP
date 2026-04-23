@@ -1,3 +1,10 @@
+
+"""
+Redumentry layout of SQL database. To be expanded to allow for more robust file access, model storage, and more
+descriptive data to be displayed for CSV file (#columns, rows, CSV Headers, etc.)
+"""
+
+
 import sqlite3
 import pandas as pd
 
@@ -32,6 +39,6 @@ cursor.execute(sql_create_table)
 try:
     cursor.execute(sql_create_table)
     connection.commit()
-except Exception as:
+except Exception:
     connection.rollback()
 
