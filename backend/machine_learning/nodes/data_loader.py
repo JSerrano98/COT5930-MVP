@@ -30,6 +30,7 @@ def run(config: dict, upstream=None):
     if not os.path.isabs(path):
         base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         path = os.path.join(base, path)
+        print(path)
 
     if not os.path.exists(path):
         raise FileNotFoundError(f"DataLoader: file not found — {path}")
@@ -43,5 +44,8 @@ def run(config: dict, upstream=None):
         "label":   label if label in df.columns else None,
         "preview": df.head(5).to_dict(orient="records"),
     }
-
-    return result, df
+    print(result["columns"])
+    print(result["cols"])
+    print(result["label"])
+    print(label)
+    return result, [df, label]

@@ -10,6 +10,7 @@ const MODELS = [
       { key: 'ridge',        label: 'Ridge Regression' },
       { key: 'lasso',        label: 'Lasso Regression' },
       { key: 'elastic_net',  label: 'Elastic Net' },
+      { key: 'linear',       label: 'Linear Regression' },
     ],
   },
   {
@@ -36,6 +37,7 @@ const MODELS = [
 const HYPERPARAMS = {
   logistic:      [{ key: 'C', label: 'C', default: 1.0 }, { key: 'max_iter', label: 'Max Iter', default: 1000 }],
   ridge:         [{ key: 'alpha', label: 'Alpha (Î»)', default: 1.0 }],
+  linear:        [{ key: 'C', label: 'C', default: 1.0}, {key: 'max_iter', label: 'Max Iter', default: 1000}],
   lasso:         [{ key: 'alpha', label: 'Alpha (Î»)', default: 1.0 }, { key: 'max_iter', label: 'Max Iter', default: 1000 }],
   elastic_net:   [{ key: 'alpha', label: 'Alpha (Î»)', default: 1.0 }, { key: 'l1_ratio', label: 'L1 Ratio', default: 0.5 }],
   svm:           [{ key: 'C', label: 'C', default: 1.0 }, { key: 'kernel', label: 'Kernel', type: 'select', options: ['rbf','linear','poly'], default: 'rbf' }],

@@ -89,6 +89,7 @@ def _train_neural_mlp(spec: dict, splits: dict, config: dict):
 
 
 def run(config: dict, upstream):
+    print('hello')
     if not isinstance(upstream, dict):
         raise ValueError("Trainer requires splits dict from a Split node (+ Model node).")
 

@@ -1,0 +1,118 @@
+{
+  "name": "Untitled Pipeline",
+  "nodes": [
+    {
+      "id": "data_loader_1_1777056029396",
+      "type": "data_loader",
+      "position": {
+        "x": -279.2892455110974,
+        "y": -393.66887217228066
+      },
+      "config": {
+        "source": "csv",
+        "path": "",
+        "label": "",
+        "sep": ","
+      },
+      "label": "Data Loader",
+      "style": {}
+    },
+    {
+      "id": "preprocessor_2_1777056043284",
+      "type": "preprocessor",
+      "position": {
+        "x": -519.6072622733036,
+        "y": -118.76291093463897
+      },
+      "config": {},
+      "label": "Preprocessor",
+      "style": {}
+    },
+    {
+      "id": "feature_3_1777056052080",
+      "type": "feature",
+      "position": {
+        "x": -242.74392054621035,
+        "y": -45.62081286863457
+      },
+      "config": {
+        "features": [
+          "mean",
+          "std"
+        ],
+        "windowSize": 256,
+        "overlap": 0.5
+      },
+      "label": "Feature",
+      "style": {}
+    },
+    {
+      "id": "evaluator_4_1777056098225",
+      "type": "evaluator",
+      "position": {
+        "x": 276.1482879227503,
+        "y": 21.21307845459077
+      },
+      "config": {},
+      "label": "Evaluator",
+      "style": {}
+    },
+    {
+      "id": "trainer_5_1777056105440",
+      "type": "trainer",
+      "position": {
+        "x": 188.58797277127235,
+        "y": -288.95640156423843
+      },
+      "config": {},
+      "label": "Trainer",
+      "style": {}
+    },
+    {
+      "id": "evaluator_6_1777056175950",
+      "type": "evaluator",
+      "position": {
+        "x": 415.5477475135841,
+        "y": -502.0279641301977
+      },
+      "config": {},
+      "label": "Evaluator",
+      "style": {}
+    },
+    {
+      "id": "split_7_1777056192663",
+      "type": "split",
+      "position": {
+        "x": -727.262361511147,
+        "y": -382.67558481583166
+      },
+      "config": {},
+      "label": "Split",
+      "style": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-trainer_5_1777056105440-evaluator_4_1777056098225",
+      "source": "trainer_5_1777056105440",
+      "target": "evaluator_4_1777056098225",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-data_loader_1_1777056029396-feature_3_1777056052080",
+      "source": "data_loader_1_1777056029396",
+      "target": "feature_3_1777056052080",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-feature_3_1777056052080-trainer_5_1777056105440",
+      "source": "feature_3_1777056052080",
+      "target": "trainer_5_1777056105440",
+      "sourceHandle": null,
+      "targetHandle": null
+    }
+  ],
+  "train_node_id": null
+}

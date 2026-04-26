@@ -59,8 +59,10 @@ class PipelineSchema(BaseModel):
 @router.post("/pipeline/run")
 async def run_pipeline(pipeline: PipelineSchema):
     """Execute the full ML pipeline and return per-node results."""
+    print('help help')
     try:
         result = execute(pipeline.model_dump())
+        print(result)
         return result
     except Exception as exc:
         logger.error("Pipeline execution failed: %s", exc)
