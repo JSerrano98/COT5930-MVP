@@ -80,7 +80,8 @@ def execute(pipeline: dict) -> dict:
         node   = nodes_by_id[nid]
         ntype  = node["type"]
         config = node.get("config", {})
-
+        print('this is the information that your looking for')
+        print(node)
         runner = NODE_RUNNERS.get(ntype)
         if runner is None:
             logger.warning("No runner for node type '%s' — skipping.", ntype)

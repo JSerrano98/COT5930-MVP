@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaPlay } from 'react-icons/fa';
 
 
 
@@ -6,13 +7,22 @@ const BACKEND = 'http://localhost:8000';
 
 const renderdata = (filenames) =>{
    return(
-    <div className='p-3  items-center divide-y divide-dashed md:divide-solid'>
+    <div className='p-3 flex  flex-col gap-y-3'>
     {filenames.map((file) => (
-      <div className='flex items-center space-x-3'>
-      <button className='btn'>download</button>
-      <div> {file} </div>
-      <hr />
+      <div className='flex items-center flex-wrap space-x-5'>
+        <text>
+          <button className='btn bg-sky-500 hover:bg-sky-300 '>download</button>
+        </text>
+        <text>
+          <button className='btn  hover:bg-emerald-100 flex items-center gap-x-1'>
+             <p className='gap-x-1'>run</p> 
+             <FaPlay size={12.5} color="#008000" />
+          </button>
+        </text>
+        <div> {file} </div>
+        <hr className='w-full mt-3 border-gray-600' />
       </div>
+      
     ))}
     </div>
    )
