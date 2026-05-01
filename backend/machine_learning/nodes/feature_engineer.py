@@ -106,14 +106,10 @@ def run(config: dict, upstream):
     window_size = int(config.get("windowSize", 256))
     overlap     = float(config.get("overlap",  0.5))
     fs          = float(config.get("fs",       256))
-    label_col   = upstream[1]
+    label_col   = config.get("label", None)
 
     # Find label column heuristically if not specified
 
-    print('feature')
-    print(config)
-    print(upstream)
-    print(label_col)
     if not label_col:
         for c in upstream.columns:
             if c.lower() in ("label", "class", "target", "y"):
@@ -121,7 +117,7 @@ def run(config: dict, upstream):
                 break
 
     step = max(1, int(window_size * (1 - overlap)))
-    feature_df = extract_windows(upstream[0], label_col, window_size, step, features, fs)
+    feature_df = extract_windows(upstream, label_col, window_size, step, features, fs)
 
     if feature_df.empty:
         raise ValueError("FeatureEngineer: no windows could be extracted — check window size vs. data length.")
@@ -131,5 +127,4 @@ def run(config: dict, upstream):
         "windows":       len(feature_df),
         "features":      features,
     }
-    print(feature_df)
-    return result, [feature_df, label_col]
+    return result, feature_df

@@ -53,7 +53,7 @@ const EvalNode = ({ data }) => {
                     {r.confusion_matrix.map((row, i) => (
                       <tr key={i}>
                         {row.map((cell, j) => (
-                          <td key={j} className="px-2 py-0.5 text-center border border-slate-700 min-w-[28px]">{cell}</td>
+                          <td key={j} className="px-2 py-0.5 text-center border border-slate-700 min-w-7">{cell}</td>
                         ))}
                       </tr>
                     ))}

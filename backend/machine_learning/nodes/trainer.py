@@ -28,7 +28,7 @@ def _train_sklearn(model_obj, splits: dict, config: dict):
     y_val   = splits.get("y_val")
 
     cv_folds = int(config.get("cv", 0))
-    task     = splits.get("task", "classification")
+    task     = config.get("task", "classification")
 
     model_obj.fit(X_train, y_train)
 

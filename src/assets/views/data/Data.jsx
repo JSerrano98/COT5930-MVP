@@ -5,6 +5,7 @@ import { FaPlay } from 'react-icons/fa';
 
 const BACKEND = 'http://localhost:8000';
 
+
 const renderdata = (filenames) =>{
    return(
     <div className='p-3 flex  flex-col gap-y-3'>
@@ -63,8 +64,14 @@ const Data = () => {
   
 
 }
+/*
+ const handleReplay = (file) =>{
+   const response = await fetch(BACKEND + '/replay');
+   const 
+   // needs to be able to play pause rewind fast forward
+  }
 
-
+*/
 
   useEffect(() => { 
     const fetchData = async () => {

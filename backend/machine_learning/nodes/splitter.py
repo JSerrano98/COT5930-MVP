@@ -12,7 +12,7 @@ def run(config: dict, upstream):
     if upstream is None:
         raise ValueError("Split requires upstream data.")
 
-    df        = upstream[0].copy()
+    df        = upstream.copy()
     test_size = float(config.get("testSize",  0.2))
     val_size  = float(config.get("valSize",   0.1))
     strategy  = config.get("strategy",  "stratified")
@@ -20,12 +20,9 @@ def run(config: dict, upstream):
     seed      = int(config.get("seed",  42))
 
     # Detect label column
-    #print(upstream[0])
-    label_col = upstream[1]
-    #print(test_size)
-    #print(val_size)
-    print(label_col)
-    #print(df)
+    label_col = config.get('label', None)
+  
+   
     if not label_col:
         for c in df.columns:
             if c.lower() in ("label", "class", "target", "y"):

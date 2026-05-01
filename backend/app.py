@@ -117,6 +117,10 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 
+@app.get('/replay')
+def replay():
+     return {"ok": True, "status": 'success'}
+
 
 @app.get('/CSV/')
 def list_files():

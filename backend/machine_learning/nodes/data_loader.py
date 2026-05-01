@@ -44,8 +44,4 @@ def run(config: dict, upstream=None):
         "label":   label if label in df.columns else None,
         "preview": df.head(5).to_dict(orient="records"),
     }
-    print(result["columns"])
-    print(result["cols"])
-    print(result["label"])
-    print(label)
-    return result, [df, label]
+    return result , df 

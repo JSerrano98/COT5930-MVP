@@ -74,7 +74,7 @@ const MLNodeBase = ({
   handles,
   children,
   minWidth = 260,
-  minHeight = 120,
+  minHeight = 240,
   resizable = true,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -87,12 +87,12 @@ const MLNodeBase = ({
 
       {/* Header / drag handle */}
       <div className="ml-node-drag flex items-center gap-2 px-3 py-2 bg-slate-800 border-b border-slate-700 flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
-        <svg className="w-3 h-3 text-slate-600 flex-shrink-0" fill="currentColor" viewBox="0 0 8 12">
+        <svg className="w-3 h-3 text-slate-600 shrink-0" fill="currentColor" viewBox="0 0 8 12">
           <circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/>
           <circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/>
           <circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/>
         </svg>
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} title={s.label} />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} title={s.label} />
         <span className="text-[11px] font-semibold text-slate-200 tracking-wide truncate flex-1">{label}</span>
         <button
           onClick={() => setCollapsed(c => !c)}

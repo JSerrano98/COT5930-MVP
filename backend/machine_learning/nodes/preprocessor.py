@@ -52,7 +52,6 @@ def run(config: dict, upstream):
     scaler = config.get("scaler",  "standard")
     filt   = config.get("filter",  "none")
     dropna = config.get("dropNa",  True)
-
     # Drop NaN
     if dropna:
         df = df.dropna()

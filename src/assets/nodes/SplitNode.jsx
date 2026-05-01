@@ -8,7 +8,7 @@ const SplitNode = ({ data }) => {
   const cfg = data?.config ?? {};
   const [testSize,  setTestSize]  = useState(cfg.testSize  ?? 0.2);
   const [valSize,   setValSize]   = useState(cfg.valSize   ?? 0.1);
-  const [strategy,  setStrategy]  = useState(cfg.strategy  ?? 'stratified');
+  const [strategy,  setStrategy]  = useState(cfg.strategy  ?? 'random');
   const [shuffle,   setShuffle]   = useState(cfg.shuffle   ?? true);
   const [seed,      setSeed]      = useState(cfg.seed      ?? 42);
 

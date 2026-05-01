@@ -65,7 +65,7 @@ def execute(pipeline: dict) -> dict:
     nodes_raw  = pipeline.get("nodes", [])
     edges_raw  = pipeline.get("edges", [])
     train_node = pipeline.get("train_node_id")
-
+    print('this is the train node id', train_node)
     nodes_by_id = {n["id"]: n for n in nodes_raw}
     node_ids    = list(nodes_by_id.keys())
 
@@ -75,12 +75,17 @@ def execute(pipeline: dict) -> dict:
     outputs: dict[str, Any] = {}
     node_results: list[dict] = []
     trainer_result: dict = {}
+    upstream_config = {}
+    up = {}
+    #print('these are the raw nodes:', nodes_raw)
 
+    #print('this is what is stored in order:', order)
     for nid in order:
         node   = nodes_by_id[nid]
         ntype  = node["type"]
         config = node.get("config", {})
-        print('this is the information that your looking for')
+        upstream_config |= config
+        #print('node information')
         print(node)
         runner = NODE_RUNNERS.get(ntype)
         if runner is None:
@@ -104,17 +109,25 @@ def execute(pipeline: dict) -> dict:
 
         logger.info("Executing node %s [%s]", nid, ntype)
         try:
-            result, output = runner(config, upstream)
+            result, output = runner(upstream_config, upstream)
         except Exception as exc:
             logger.error("Node %s failed: %s", nid, exc)
             raise RuntimeError(f"Node '{node.get('label', nid)}' ({ntype}) failed: {exc}") from exc
 
         outputs[nid] = output
         node_results.append({"id": nid, "result": result})
+        if node.get('label', nid) == 'Split':
+            up |= output
+        if node.get('label', nid) == 'Model':
+            up |= output
 
         if nid == train_node:
             trainer_result = result
-
+    print(up)
+    print(upstream_config)
+    runner = NODE_RUNNERS.get("trainer")
+    result, output = runner(upstream_config, up)
+    trainer_result = result
     return {
         "ok":             True,
         "node_results":   node_results,

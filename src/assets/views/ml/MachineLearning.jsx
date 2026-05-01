@@ -75,7 +75,6 @@ const MachineLearning = () => {
 
     patchNode(trainerId, { status: 'running', result: { progress: 0 } });
     setPipelineStatus('running');
-    console.log(JSON.stringify(pipeline))
 
     try {
       const res = await fetch(`${BACKEND}/ml/pipeline/run`, {
@@ -87,10 +86,10 @@ const MachineLearning = () => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail ?? 'Training failed');
-      }
+      };
 
       const data = await res.json();
-      console.log(data)
+
 
       (data.node_results ?? []).forEach(({ id, result }) => {
         patchNode(id, { status: 'done', result });
