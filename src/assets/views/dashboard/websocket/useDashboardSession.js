@@ -36,13 +36,17 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
       disconnectWs();
     });
 
+    // Session was already started by the main process during startup.
+    // Just check its status and connect WS — don't auto-start again.
     window.echo.sessionStatus().then(({ running }) => {
       if (running) {
         setSessionRunning(true);
         connectWs();
       }
+      // If somehow not running (e.g. session failed), user can start manually.
     });
-  }, [connectWs, disconnectWs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { sessionRunning, sessionStarting, startSession, stopSession };
 };

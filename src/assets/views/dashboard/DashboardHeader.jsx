@@ -8,38 +8,21 @@ const StatusDot = ({ connected }) => (
 );
 
 const DashboardHeader = ({
-  connected, streams, loading, recording, setRecording,
-  isElectron, sessionRunning, sessionStarting,
-  startSession, stopSession, onRefresh
+  connected, streams, loading, recording, onRecordClick,
+  onRefresh
 }) => (
   <header className="flex items-center justify-between px-6 py-3 border-b border-slate-700 bg-slate-900 flex-shrink-0">
     <div className="flex items-center gap-3">
 
       <StatusDot connected={connected} />
 
-      {isElectron && (
-        <button
-          onClick={sessionRunning ? stopSession : startSession}
-          disabled={sessionStarting}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-transparent border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white transition-all disabled:opacity-60 disabled:cursor-wait"
-        >
-          {sessionStarting ? (
-            <span className="text-yellow-400">Starting Up...</span>
-          ) : sessionRunning ? (
-            <span className="text-red-400">Stop Session</span>
-          ) : (
-            <span className="text-emerald-400">Start Session</span>
-          )}
-        </button>
-      )}
-
       <button
-        onClick={() => setRecording((r) => !r)}
+        onClick={onRecordClick}
         disabled={!connected}
         className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-transparent border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        <span className={`w-2 h-2 rounded-full ${recording ? 'bg-red-400' : 'bg-slate-400'}`} />
-        {recording ? 'Recording' : 'Record'}
+        <span className={`w-2 h-2 rounded-full ${recording ? 'bg-red-400 animate-pulse' : 'bg-slate-400'}`} />
+        {recording ? 'Stop Recording' : 'Record'}
       </button>
     </div>
 

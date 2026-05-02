@@ -18,14 +18,6 @@ const icons = {
       <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.636 5.636l2.121 2.121M16.243 16.243l2.121 2.121M5.636 18.364l2.121-2.121M16.243 7.757l2.121-2.121" />
     </svg>
   ),
-  data: (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <ellipse cx="12" cy="5" rx="9" ry="3" />
-      <path d="M3 5v5c0 1.657 4.03 3 9 3s9-1.343 9-3V5" />
-      <path d="M3 10v5c0 1.657 4.03 3 9 3s9-1.343 9-3v-5" />
-      <path d="M3 15v4c0 1.657 4.03 3 9 3s9-1.343 9-3v-4" />
-    </svg>
-  ),
   settings: (
     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
       <circle cx="12" cy="12" r="3" />
@@ -77,10 +69,6 @@ const Navbar = () => {
         <NavLink to="/ml" className={linkClass} title="Machine Learning">
           {icons.ml}
           {!collapsed && <span>Machine Learning</span>}
-        </NavLink>
-        <NavLink to="/data" className={linkClass} title="Data">
-          {icons.data}
-          {!collapsed && <span>Data</span>}
         </NavLink>
       </div>
 

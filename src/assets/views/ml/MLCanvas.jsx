@@ -2,7 +2,6 @@ import { useCallback, useRef } from 'react';
 import ReactFlow, {
   Background, Controls, MiniMap,
   addEdge,
-  useNodesState, useEdgesState,
   ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -125,12 +124,11 @@ const MLCanvasInner = ({
         proOptions={{ hideAttribution: true }}
         minZoom={0.2}
         maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        defaultViewport={{ x: 40, y: 40, zoom: 0.65 }}
         nodesDraggable
         nodesConnectable
         elementsSelectable
         deleteKeyCode="Delete"
-        fitView
       >
         <Background color="#1e293b" gap={20} />
         <Controls className="[&>button]:bg-slate-800 [&>button]:border-slate-700 [&>button]:text-slate-400 [&>button:hover]:bg-slate-700" />

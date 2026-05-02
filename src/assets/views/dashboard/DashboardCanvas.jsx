@@ -4,6 +4,8 @@ import 'reactflow/dist/style.css';
 import Monitor from './monitor/Monitor';
 import WaveformNode from './monitor/WaveformNode';
 import StatsNode from './monitor/StatsNode';
+import BPMNode from './monitor/BPMNode';
+import MLModelNode from './monitor/MLModelNode';
 
 // Each node wraps its content in Monitor to get the header + container
 const WaveformFlowNode = ({ data }) => (
@@ -18,28 +20,55 @@ const StatsFlowNode = ({ data }) => (
   </Monitor>
 );
 
+const BPMFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="bpm" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <BPMNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const MLFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
+  </Monitor>
+);
+
 const nodeTypes = {
   waveform: WaveformFlowNode,
   stats:    StatsFlowNode,
+  bpm:      BPMFlowNode,
+  ml:       MLFlowNode,
 };
 
 const DEFAULT_W = 340;
 const DEFAULT_H = 220;
 
-function DashboardCanvas({ monitors = [], dataRef, onRemove, onUpdateMonitor }) {
-  const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => ({
-    id: mon.id,
-    type: mon.nodeType,
-    position: posMap[mon.id] ?? { x: 80 + (idx % 3) * (DEFAULT_W + 20), y: 80 + Math.floor(idx / 3) * (DEFAULT_H + 20) },
-    data: {
-      stream: mon.stream,
-      dataRef,
-      lineColor: mon.lineColor,
-      onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
-      onRemove: () => onRemove(mon.id),
-    },
-    style: sizeMap[mon.id] ?? { width: DEFAULT_W, height: DEFAULT_H },
-  });
+const NODE_DEFAULTS = {
+  bpm: { width: 220, height: 200 },
+  ml: { width: 320, height: 260 },
+};
+
+function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpdateMonitor }) {
+  const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => {
+    const defaultSize = NODE_DEFAULTS[mon.nodeType]
+      ? { width: NODE_DEFAULTS[mon.nodeType].width, height: NODE_DEFAULTS[mon.nodeType].height }
+      : { width: DEFAULT_W, height: DEFAULT_H };
+    return {
+      id: mon.id,
+      type: mon.nodeType,
+      position: posMap[mon.id] ?? { x: 80 + (idx % 3) * (DEFAULT_W + 20), y: 80 + Math.floor(idx / 3) * (DEFAULT_H + 20) },
+      data: {
+        stream: mon.stream,
+        monitor: mon,
+        streams,
+        dataRef,
+        lineColor: mon.lineColor,
+        onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
+        onPatch: (patch) => onUpdateMonitor(mon.id, patch),
+        onRemove: () => onRemove(mon.id),
+      },
+      style: sizeMap[mon.id] ?? defaultSize,
+    };
+  };
 
   const [nodes, setNodes, onNodesChange] = useNodesState(monitors.map((m, i) => makeNode(m, i)));
   const [edges, setEdges, onEdgesState] = useEdgesState([]);

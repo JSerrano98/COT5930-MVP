@@ -51,12 +51,32 @@ const DataLoaderNode = ({ data }) => {
         <>
           <div className="mb-2">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">File Path</p>
-            <input
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
-              placeholder="data/recordings/session.csv"
-              value={path}
-              onChange={e => { setPath(e.target.value); update({ path: e.target.value }); }}
-            />
+            <div className="flex gap-1">
+              <input
+                className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500 min-w-0"
+                placeholder="data/recordings/session.csv"
+                value={path}
+                onChange={e => { setPath(e.target.value); update({ path: e.target.value }); }}
+              />
+              <button
+                className="px-2 py-1 text-[10px] font-semibold bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 transition-colors whitespace-nowrap"
+                onClick={async () => {
+                  try {
+                    const picked = await window.echo.pickFile({
+                      filters: [
+                        { name: 'CSV Files', extensions: ['csv'] },
+                        { name: 'All Files', extensions: ['*'] },
+                      ],
+                    });
+                    if (picked) { setPath(picked); update({ path: picked }); }
+                  } catch (err) {
+                    console.error('pickFile error', err);
+                  }
+                }}
+              >
+                Browse
+              </button>
+            </div>
           </div>
           <div className="mb-2">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Delimiter</p>

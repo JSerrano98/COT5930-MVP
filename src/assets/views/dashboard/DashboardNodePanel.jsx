@@ -1,6 +1,7 @@
 const NODE_TYPES = [
-  { key: 'waveform', label: 'Waveform' },
+  { key: 'waveform', label: 'Waveform', excludeType: 'HeartRate' },
   { key: 'stats',    label: 'Stats' },
+  { key: 'bpm',      label: 'BPM', onlyType: 'HeartRate' },
 ];
 
 const groupByType = (streams) =>
@@ -10,7 +11,7 @@ const groupByType = (streams) =>
     return acc;
   }, {});
 
-const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onRemove, sessionRunning, collapsed = false, onToggle }) => {
+const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, onRemove, sessionRunning, collapsed = false, onToggle }) => {
   const groups = groupByType(streams);
 
   const countByStream = monitors.reduce((acc, m) => {
@@ -23,7 +24,16 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onRemove, sess
       {/* Header with toggle */}
       <div className="flex items-center justify-between px-2 py-3 border-b border-slate-700 flex-shrink-0">
         {!collapsed && (
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Streams</span>
+          <div className="flex items-center gap-2 px-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Streams</span>
+            <button
+              onClick={onAddModel}
+              title="Add ML model monitor"
+              className="px-2 py-0.5 text-[9px] font-semibold tracking-wider border border-violet-500/60 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
+            >
+              + ML MODEL
+            </button>
+          </div>
         )}
         <button
           onClick={onToggle}
@@ -68,7 +78,7 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onRemove, sess
                         )}
                       </div>
                       <div className="flex gap-px">
-                        {NODE_TYPES.map((nt) => (
+                        {NODE_TYPES.filter(nt => (!nt.onlyType || nt.onlyType === stream.type) && (!nt.excludeType || nt.excludeType !== stream.type)).map((nt) => (
                           <button
                             key={nt.key}
                             onClick={() => onAdd(stream, nt.key)}
@@ -93,7 +103,7 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onRemove, sess
                 {monitors.map((mon) => (
                   <li key={mon.id} className="flex items-center gap-2 py-1.5 group">
                     <span className="flex-1 min-w-0 text-[11px] text-slate-400 font-mono truncate">
-                      {mon.stream?.name ?? 'Unknown'}
+                      {mon.stream?.name ?? mon.sensorName ?? 'ML Model'}
                       <span className="ml-1 text-slate-400">· {mon.nodeType}</span>
                     </span>
                     <button

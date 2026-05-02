@@ -1,18 +1,20 @@
+import { useState, useCallback } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { DevModeProvider } from './assets/context/DevModeContext';
 import { AlertProvider } from './assets/context/AlertContext';
 import AlertOverlay from './assets/components/AlertOverlay';
+import SplashScreen from './assets/components/SplashScreen';
 
 import Navbar from './assets/components/Navbar';
 import Dashboard from './assets/views/dashboard/Dashboard';
 import Settings from './assets/views/settings/Settings';
 import MachineLearning from './assets/views/ml/MachineLearning';
-import Data from './assets/views/data/Data';
 
 // Inner component so useLocation works inside HashRouter
 const AppLayout = () => {
   const { pathname } = useLocation();
   const isDashboard = pathname === '/';
+  const isML        = pathname === '/ml';
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -22,12 +24,15 @@ const AppLayout = () => {
           <Dashboard />
         </div>
 
-        {/* Other routes render normally on top when active */}
-        {!isDashboard && (
+        {/* ML is always mounted — visibility toggled so pipeline state persists */}
+        <div style={{ display: isML ? 'flex' : 'none', width: '100%', height: '100%' }}>
+          <MachineLearning />
+        </div>
+
+        {/* Other routes render normally */}
+        {!isDashboard && !isML && (
           <Routes>
             <Route path="/settings" element={<Settings />} />
-            <Route path="/ml" element={<MachineLearning />} />
-            <Route path="/data" element={<Data />} />
           </Routes>
         )}
       </div>
@@ -36,15 +41,27 @@ const AppLayout = () => {
   );
 };
 
-const App = () => (
-  <HashRouter>
-    <DevModeProvider>
-      <AlertProvider>
-        <AlertOverlay />
-        <AppLayout />
-      </AlertProvider>
-    </DevModeProvider>
-  </HashRouter>
-);
+const App = () => {
+  const isElectron = Boolean(window.echo?.getStartupStatus);
+  const [appReady, setAppReady] = useState(isElectron);
+  const handleReady = useCallback(() => setAppReady(true), []);
+
+  return (
+    <HashRouter>
+      <DevModeProvider>
+        <AlertProvider>
+          {!appReady ? (
+            <SplashScreen onReady={handleReady} />
+          ) : (
+            <>
+              <AlertOverlay />
+              <AppLayout />
+            </>
+          )}
+        </AlertProvider>
+      </DevModeProvider>
+    </HashRouter>
+  );
+};
 
 export default App;

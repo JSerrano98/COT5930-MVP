@@ -5,6 +5,7 @@ import DashboardHeader from './DashboardHeader';
 import DashboardCanvas from './DashboardCanvas';
 import DashboardFooter from './DashboardFooter';
 import DashboardNodePanel from './DashboardNodePanel';
+import RecordingDialog from './RecordingDialog';
 import { useDashboardWebSocket } from './websocket/useDashboardWebSocket';
 import { useDashboardSession } from './websocket/useDashboardSession';
 import { useDevMode } from '../../context/DevModeContext';
@@ -17,6 +18,7 @@ const uid = () => `mon_${++_id}_${Date.now()}`;
 const Dashboard = () => {
   const [monitors, setMonitors] = useState([]);
   const [_recording, setRecording] = useState(false);
+  const [showRecordDialog, setShowRecordDialog] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const { setBackendLogs } = useDevMode();
@@ -33,7 +35,7 @@ const Dashboard = () => {
   const { connected, streams, loading, dataRef, connectWs, disconnectWs, refreshStreams } =
     useDashboardWebSocket();
 
-  const { sessionRunning, sessionStarting, startSession, stopSession } =
+  const { sessionRunning } =
     useDashboardSession({ connectWs, disconnectWs, setBackendLogs });
 
   // Reset recording when WebSocket drops — derive from connected rather than an effect
@@ -67,14 +69,44 @@ const Dashboard = () => {
     prevRecording.current  = recording;
   }, [connected, sessionRunning, recording, pushAlert]);
 
-  // Wrapped stop handlers that mark the stop as user-initiated
-  const handleStopSession = () => {
-    userStoppedSession.current = true;
-    stopSession();
-  };
   const handleSetRecording = (val) => {
     if (!val) userStoppedRecording.current = true;
     setRecording(val);
+  };
+
+  // Called when the Record button is clicked
+  const handleRecordClick = async () => {
+    if (recording) {
+      // Stop recording
+      userStoppedRecording.current = true;
+      let savedTo = '';
+      if (isElectron && window.echo?.stopRecording) {
+        const result = await window.echo.stopRecording();
+        savedTo = result?.saved_to ?? '';
+      } else {
+        const result = await fetch('http://localhost:8000/record/stop', { method: 'POST' })
+          .then((r) => r.json())
+          .catch(() => ({}));
+        savedTo = result?.saved_to ?? '';
+      }
+      setRecording(false);
+      pushAlert({
+        type: 'success',
+        title: 'Recording Saved',
+        message: savedTo ? `Saved to ${savedTo}` : 'Recording file was saved.',
+      });
+    } else {
+      setShowRecordDialog(true);
+    }
+  };
+
+  const handleRecordConfirm = () => {
+    setShowRecordDialog(false);
+    setRecording(true);
+  };
+
+  const handleRecordCancel = () => {
+    setShowRecordDialog(false);
   };
 
   // Auto-connect WebSocket when not running inside Electron
@@ -89,8 +121,29 @@ const Dashboard = () => {
       { id: uid(), color: SIGNAL_COLORS[prev.length % SIGNAL_COLORS.length], nodeType, stream },
     ]);
 
-  const removeMonitor = (id) =>
+  const addModelMonitor = () =>
+    setMonitors((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        nodeType: 'ml',
+        stream: null,
+        sensorUid: '',
+        sensorName: `ML_${Date.now().toString().slice(-5)}`,
+        sourceName: '',
+        sourceType: '',
+        modelPath: '',
+        running: false,
+      },
+    ]);
+
+  const removeMonitor = (id) => {
+    const mon = monitors.find((m) => m.id === id);
+    if (mon?.nodeType === 'ml' && mon.sensorUid) {
+      fetch(`http://localhost:8000/ml-sensors/${mon.sensorUid}`, { method: 'DELETE' }).catch(() => {});
+    }
     setMonitors((prev) => prev.filter((m) => m.id !== id));
+  };
 
   const updateMonitor = (id, patch) =>
     setMonitors((prev) => prev.map((m) => m.id === id ? { ...m, ...patch } : m));
@@ -112,12 +165,7 @@ const Dashboard = () => {
         streams={streams}
         loading={loading}
         recording={recording}
-        setRecording={handleSetRecording}
-        isElectron={isElectron}
-        sessionRunning={sessionRunning}
-        sessionStarting={sessionStarting}
-        startSession={startSession}
-        stopSession={handleStopSession}
+        onRecordClick={handleRecordClick}
         onRefresh={refreshStreams}
       />
 
@@ -126,6 +174,7 @@ const Dashboard = () => {
           monitors={monitors}
           streams={streams}
           onAdd={addMonitor}
+          onAddModel={addModelMonitor}
           onRemove={removeMonitor}
           sessionRunning={sessionRunning}
           collapsed={panelCollapsed}
@@ -134,6 +183,7 @@ const Dashboard = () => {
 
         <DashboardCanvas
           monitors={monitors}
+          streams={streams}
           dataRef={dataRef}
           onRemove={removeMonitor}
           onUpdateMonitor={updateMonitor}
@@ -141,6 +191,14 @@ const Dashboard = () => {
       </div>
 
       <DashboardFooter monitors={monitors} />
+
+      {showRecordDialog && (
+        <RecordingDialog
+          isElectron={isElectron}
+          onConfirm={handleRecordConfirm}
+          onCancel={handleRecordCancel}
+        />
+      )}
     </div>
   );
 };
