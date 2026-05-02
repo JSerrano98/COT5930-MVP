@@ -18,9 +18,9 @@ const buildDefaultParams = (schema = {}) => {
 };
 
 const StatCard = ({ title, value }) => (
-  <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
-    <p className="text-[10px] uppercase tracking-wider text-stone-500">{title}</p>
-    <p className="mt-1 text-lg font-semibold text-stone-900">{value}</p>
+  <div className="border border-echo-border bg-echo-surface-2 p-3">
+    <p className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">{title}</p>
+    <p className="mt-1 text-lg font-ui font-semibold text-white">{value}</p>
   </div>
 );
 
@@ -28,6 +28,14 @@ const formatMetric = (value) => {
   if (value === null || value === undefined) return '--';
   if (typeof value !== 'number') return String(value);
   return value.toFixed(4);
+};
+
+const getModelsDir = () =>
+  localStorage.getItem('echo_models_dir') || 'backend/ml_models';
+
+const getModelFilePreview = (modelName, modelKey) => {
+  const rawName = (modelName?.trim() || modelKey || 'model').replace(/\s+/g, '_');
+  return `${rawName}.pkl`;
 };
 
 // Configure + Train step
@@ -112,7 +120,7 @@ const MLTrainForm = ({ intake, onBack }) => {
         model_key: modelKey,
         model_name: intake.modelName?.trim() || '',
         params,
-        save_dir: intake.saveDir ?? '',
+        save_dir: localStorage.getItem('echo_models_dir') || 'backend/ml_models',
         ...split,
       };
       const res  = await fetch(`${BACKEND}/ml/workbench/train`, {
@@ -132,40 +140,43 @@ const MLTrainForm = ({ intake, onBack }) => {
 
   const taskLabel = intake.taskType === 'regression' ? 'Regression' : 'Classification';
   const taskColor = intake.taskType === 'regression'
-    ? 'text-blue-600 bg-blue-50 border-blue-200'
-    : 'text-violet-600 bg-violet-50 border-violet-200';
+    ? 'text-echo-blue border-echo-blue/40 bg-echo-blue/10'
+    : 'text-purple-400 border-purple-500/40 bg-purple-500/10';
+  const saveDir = getModelsDir();
+  const saveFile = getModelFilePreview(intake.modelName, modelKey);
 
   return (
-    <div className="h-full w-full overflow-auto bg-stone-100 p-6 text-stone-900">
+    <div className="h-full w-full overflow-auto bg-echo-bg">
+      <div className="mx-auto w-full max-w-7xl px-6 py-6">
       <div className="mb-6 flex items-center gap-4">
         <button
           onClick={onBack}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:border-stone-400 hover:bg-stone-50"
+          className="border border-echo-border bg-echo-surface px-3 py-1.5 text-[10px] font-ui font-semibold tracking-widest uppercase text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
         >
-          ← Back
+          Back
         </button>
         <div>
-          <h1 className="text-xl font-semibold text-stone-900">Model Workbench</h1>
-          <div className="mt-1 flex items-center gap-2 text-sm text-stone-500">
-            <span className="max-w-[240px] truncate" title={intake.datasetPath}>
-              {intake.datasetPath.split(/[\\/]/).pop()}
+          <h1 className="font-title text-3xl tracking-[0.1em] text-white">MODEL WORKBENCH</h1>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-[10px] text-echo-dim font-body max-w-[240px] truncate" title={intake.datasetPath}>
+              {intake.datasetPath.split(/[\/\\]/).pop()}
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${taskColor}`}>
+            <span className={`border px-2 py-0.5 text-[9px] font-ui font-semibold tracking-widest uppercase ${taskColor}`}>
               {taskLabel}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="grid min-h-full w-full grid-cols-1 gap-6 xl:grid-cols-3">
-        <section className="rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm xl:col-span-2">
+      <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-3">
+        <section className="border border-echo-border bg-echo-surface p-5 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Model</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Model</span>
               <select
                 value={modelKey}
                 onChange={(e) => onModelChange(e.target.value)}
-                className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500"
+                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
               >
                 {Object.entries(filteredModels).map(([key, spec]) => (
                   <option key={key} value={key}>{spec.label}</option>
@@ -173,23 +184,29 @@ const MLTrainForm = ({ intake, onBack }) => {
               </select>
             </label>
 
-            <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600 shadow-sm">
-              <p>Dataset: <span className="break-all font-semibold text-stone-900">{intake.datasetPath.split(/[\\/]/).pop()}</span></p>
-              <p className="mt-1">Rows: <span className="font-semibold text-stone-900">{datasetRows ?? '—'}</span></p>
+            <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body">
+              <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[\/\\]/).pop()}</span></p>
+              <p className="mt-1">Rows: <span className="font-ui font-semibold text-white">{datasetRows ?? '—'}</span></p>
               {!columnsLoaded && (
-                <button onClick={loadColumns} disabled={loading} className="mt-2 text-[11px] text-emerald-600 underline disabled:opacity-50">
+                <button onClick={loadColumns} disabled={loading} className="mt-2 text-[10px] text-echo-green underline disabled:opacity-50 font-ui">
                   Load columns
                 </button>
               )}
             </div>
 
+            <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body md:col-span-2">
+              <p className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Save Destination</p>
+              <p className="mt-2 break-all text-white">{saveDir}/{saveFile}</p>
+              <p className="mt-1 text-[10px] text-echo-dim">Training automatically writes the model file here.</p>
+            </div>
+
             <label className="flex flex-col gap-1 md:col-span-2">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Label Column</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Label Column</span>
               {columns.length > 0 ? (
                 <select
                   value={labelCol}
                   onChange={(e) => setLabelCol(e.target.value)}
-                  className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500"
+                  className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
                 >
                   {columns.map((col) => (<option key={col} value={col}>{col}</option>))}
                 </select>
@@ -198,7 +215,7 @@ const MLTrainForm = ({ intake, onBack }) => {
                   value={labelCol}
                   onChange={(e) => setLabelCol(e.target.value)}
                   placeholder="target"
-                  className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none placeholder:text-stone-400 focus:border-stone-500"
+                  className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
                 />
               )}
             </label>
@@ -206,16 +223,16 @@ const MLTrainForm = ({ intake, onBack }) => {
 
           {modelSpec?.params && Object.keys(modelSpec.params).length > 0 && (
             <>
-              <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Model Parameters</h2>
+              <h2 className="mt-6 text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Model Parameters</h2>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {Object.entries(modelSpec.params).map(([key, meta]) => (
                   <label key={key} className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wide text-stone-500">{key}</span>
+                    <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">{key}</span>
                     {meta.type === 'enum' ? (
                       <select
                         value={params[key] ?? meta.default}
                         onChange={(e) => setParams((prev) => ({ ...prev, [key]: e.target.value }))}
-                        className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500"
+                        className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
                       >
                         {meta.options.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
                       </select>
@@ -229,7 +246,7 @@ const MLTrainForm = ({ intake, onBack }) => {
                             ? Number.parseInt(e.target.value || '0', 10)
                             : Number.parseFloat(e.target.value || '0'),
                         }))}
-                        className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500"
+                        className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
                       />
                     )}
                   </label>
@@ -238,77 +255,79 @@ const MLTrainForm = ({ intake, onBack }) => {
             </>
           )}
 
-          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Split Settings</h2>
+          <h2 className="mt-6 text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Split Settings</h2>
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Test Size</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Test Size</span>
               <input type="number" min="0.05" max="0.45" step="0.05" value={split.test_size}
                 onChange={(e) => setSplit((prev) => ({ ...prev, test_size: Number.parseFloat(e.target.value || '0.2') }))}
-                className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500" />
+                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Val Size</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Val Size</span>
               <input type="number" min="0" max="0.35" step="0.05" value={split.val_size}
                 onChange={(e) => setSplit((prev) => ({ ...prev, val_size: Number.parseFloat(e.target.value || '0.1') }))}
-                className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500" />
+                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wide text-stone-500">Random State</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Random State</span>
               <input type="number" step="1" value={split.random_state}
                 onChange={(e) => setSplit((prev) => ({ ...prev, random_state: Number.parseInt(e.target.value || '42', 10) }))}
-                className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500" />
+                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body" />
             </label>
-            <label className="flex items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 shadow-sm">
+            <label className="flex items-center gap-2 border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white font-body">
               <input type="checkbox" checked={split.shuffle}
-                onChange={(e) => setSplit((prev) => ({ ...prev, shuffle: e.target.checked }))} />
+                onChange={(e) => setSplit((prev) => ({ ...prev, shuffle: e.target.checked }))} className="accent-echo-green" />
               Shuffle
             </label>
           </div>
 
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex gap-2">
             <button onClick={train} disabled={loading || !labelCol}
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:border-emerald-400 hover:bg-emerald-100 disabled:opacity-50">
-              {loading ? 'Training…' : 'Train Model'}
+              className="border border-echo-green text-echo-green bg-echo-green/10 px-4 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase hover:bg-echo-green/20 transition-colors disabled:opacity-50">
+              {loading ? 'Training…' : 'Train & Save Model'}
             </button>
             <button onClick={() => { setResult(null); setError(''); }}
-              className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm text-stone-700 shadow-sm hover:border-stone-400 hover:bg-stone-50">
+              className="border border-echo-border text-echo-muted px-4 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase hover:border-echo-muted hover:text-white transition-colors">
               Clear Output
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">Training Output</h2>
+        <section className="border border-echo-border bg-echo-surface p-5">
+          <h2 className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Training Output</h2>
           {error && (
-            <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="mt-3 border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-400 font-body">{error}</div>
           )}
           {result ? (
-            <div className="mt-4 space-y-4">
-              <div className="rounded-lg border border-stone-200 bg-white p-3 text-xs text-stone-700 shadow-sm">
-                <p>Model: <span className="font-semibold text-stone-900">{result.model_name}</span></p>
-                <p className="mt-1 break-all">Saved to: <span className="font-mono text-stone-900">{result.model_path}</span></p>
-                <p className="mt-1">Task: <span className="font-semibold text-stone-900">{result.task}</span></p>
+            <div className="mt-4 space-y-3">
+              <div className="border border-echo-border bg-echo-surface-2 p-3 text-xs text-echo-muted font-body">
+                <p>Model: <span className="font-ui font-semibold text-white">{result.model_name}</span></p>
+                <p className="mt-1 break-all">Saved to: <span className="font-body text-white">{result.model_path}</span></p>
+                <p className="mt-1">Task: <span className="font-ui font-semibold text-white">{result.task}</span></p>
               </div>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-2">
                 <StatCard title="Train" value={formatMetric(result.metrics?.train?.accuracy ?? result.metrics?.train?.r2)} />
                 <StatCard title="Validation" value={formatMetric(result.metrics?.val?.accuracy ?? result.metrics?.val?.r2)} />
                 <StatCard title="Test" value={formatMetric(result.metrics?.test?.accuracy ?? result.metrics?.test?.r2)} />
               </div>
-              <pre className="max-h-72 overflow-auto rounded-lg border border-stone-200 bg-white p-3 text-xs text-stone-700 shadow-sm">
+              <pre className="max-h-72 overflow-auto border border-echo-border bg-echo-surface-2 p-3 text-xs text-echo-muted font-body">
                 {JSON.stringify(result, null, 2)}
               </pre>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-stone-500">No model trained yet.</p>
+            <p className="mt-3 text-sm text-echo-dim font-body">No model trained yet.</p>
           )}
         </section>
       </div>
+      </div>
     </div>
   );
+
 };
 
 // Root orchestrator
-const DEFAULT_INTAKE = { datasetPath: '', saveDir: '', taskType: '', modelName: '' };
+const DEFAULT_INTAKE = { datasetPath: '', taskType: '', modelName: '' };
 
 const MachineLearning = () => {
   const [step, setStep]     = useState('intake');   // 'intake' | 'clean' | 'configure'

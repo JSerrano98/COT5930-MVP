@@ -1,24 +1,12 @@
-import { useEffect } from 'react';
+const getModelsDir = () =>
+  localStorage.getItem('echo_models_dir') || 'backend/ml_models';
 
 /**
  * MLIntake — Step 1 of the ML workflow.
- * User picks: dataset, save directory, and task type (regression/classification).
+ * User picks: dataset and task type. Save directory comes from Settings.
  */
 const MLIntake = ({ intake, onChange, onContinue }) => {
   const isElectron = Boolean(window.echo?.pickFile);
-
-  useEffect(() => {
-    if (!window.echo?.getDefaultModelPath) return;
-    if (intake.saveDir?.trim()) return;
-
-    window.echo.getDefaultModelPath()
-      .then((defaultPath) => {
-        if (defaultPath && !intake.saveDir?.trim()) {
-          onChange({ saveDir: defaultPath });
-        }
-      })
-      .catch(() => {});
-  }, [intake.saveDir, onChange]);
 
   const browseDataset = async () => {
     if (!window.echo?.pickFile) return;
@@ -29,130 +17,88 @@ const MLIntake = ({ intake, onChange, onContinue }) => {
     if (picked) onChange({ datasetPath: picked });
   };
 
-  const browseSaveDir = async () => {
-    if (!window.echo?.pickFolder) {
-      // fallback: let them type a path
-      return;
-    }
-    const defaultPath = intake.saveDir || (await window.echo.getDefaultModelPath?.()) || undefined;
-    const picked = await window.echo.pickFolder(defaultPath);
-    if (picked) onChange({ saveDir: picked });
-  };
-
   const canContinue = intake.datasetPath.trim() && intake.taskType;
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-stone-100 p-6">
-      <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-8 shadow-md">
-        <h1 className="text-2xl font-bold text-stone-900">New Training Job</h1>
-        <p className="mt-1 text-sm text-stone-500">
-          Configure your dataset and task before selecting a model.
-        </p>
+    <div className="flex h-full w-full items-center justify-center bg-echo-bg p-6">
+      <div className="w-full max-w-lg border border-echo-border bg-echo-surface p-8">
+        {/* Corner accents */}
+        <div className="relative mb-6">
+          <h1 className="font-title text-4xl tracking-[0.1em] text-white px-8 pt-4">NEW TRAINING JOB</h1>
+          <p className="mt-1 text-xs text-echo-muted font-body px-8 pb-2">
+            Configure your dataset and task before selecting a model.
+          </p>
+        </div>
 
         {/* Dataset */}
-        <div className="mt-8 flex flex-col gap-1">
-          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <div className="mt-4 flex flex-col gap-1">
+          <label className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">
             Dataset (CSV)
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <input
               value={intake.datasetPath}
               onChange={(e) => onChange({ datasetPath: e.target.value })}
               placeholder="path/to/dataset.csv"
-              className="flex-1 rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-emerald-400 focus:bg-white"
+              className="flex-1 bg-echo-surface-2 border border-echo-border text-white px-3 py-2 text-sm focus:border-echo-green font-body"
             />
             {isElectron && (
               <button
                 onClick={browseDataset}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-700 hover:border-stone-400 hover:bg-stone-50"
+                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
               >
                 Browse
               </button>
             )}
           </div>
           {!isElectron && (
-            <span className="text-[11px] text-stone-400">
+            <span className="text-[10px] text-echo-dim font-body">
               Enter a path relative to the backend root (e.g. data/CSV/file.csv).
             </span>
           )}
         </div>
 
         {/* Model name */}
-        <div className="mt-5 flex flex-col gap-1">
-          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <div className="mt-4 flex flex-col gap-1">
+          <label className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">
             Model Name
           </label>
           <input
             value={intake.modelName ?? ''}
             onChange={(e) => onChange({ modelName: e.target.value })}
             placeholder="e.g. Heart Rate Predictor (optional)"
-            className="rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-emerald-400 focus:bg-white"
+            className="bg-echo-surface-2 border border-echo-border text-white px-3 py-2 text-sm focus:border-echo-green font-body"
           />
-          <span className="text-[11px] text-stone-400">
-            Used to identify this model in the dashboard. Optional.
-          </span>
-        </div>
-
-        {/* Save directory */}
-        <div className="mt-5 flex flex-col gap-1">
-          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-            Save Trained Model To
-          </label>
-          <div className="flex gap-2">
-            <input
-              value={intake.saveDir}
-              onChange={(e) => onChange({ saveDir: e.target.value })}
-              placeholder="Defaults to Documents/ECHO Trained Models"
-              className="flex-1 rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-emerald-400 focus:bg-white"
-            />
-            {isElectron && window.echo?.pickFolder && (
-              <button
-                onClick={browseSaveDir}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-700 hover:border-stone-400 hover:bg-stone-50"
-              >
-                Browse
-              </button>
-            )}
-          </div>
-          <span className="text-[11px] text-stone-400">
-            Default folder is created automatically if missing.
-          </span>
+          <span className="text-[10px] text-echo-dim font-body">Used to identify this model in the dashboard. Optional.</span>
         </div>
 
         {/* Task type */}
-        <div className="mt-8 flex flex-col gap-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <div className="mt-6 flex flex-col gap-3">
+          <label className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">
             Task Type
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {[
-              {
-                key: 'regression',
-                title: 'Regression',
-                desc: 'Predict a continuous value (e.g. heart rate, stress score)',
-              },
-              {
-                key: 'classification',
-                title: 'Classification',
-                desc: 'Predict a discrete label or category (e.g. emotion, state)',
-              },
+              { key: 'regression', title: 'Regression', desc: 'Predict a continuous value (e.g. heart rate, stress score)' },
+              { key: 'classification', title: 'Classification', desc: 'Predict a discrete label or category (e.g. emotion, state)' },
             ].map(({ key, title, desc }) => {
               const active = intake.taskType === key;
               return (
                 <button
                   key={key}
                   onClick={() => onChange({ taskType: key })}
-                  className={[
-                    'rounded-xl border p-4 text-left transition-colors',
+                  className={`border p-4 text-left transition-colors ${
                     active
-                      ? 'border-emerald-400 bg-emerald-50 shadow-sm'
-                      : 'border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-white',
-                  ].join(' ')}
+                      ? 'border-echo-green bg-echo-green/10'
+                      : 'border-echo-border bg-echo-surface-2 hover:border-echo-muted'
+                  }`}
                 >
-                  <p className={`font-semibold ${active ? 'text-emerald-700' : 'text-stone-800'}`}>
+                  <p className={`font-ui font-semibold text-sm ${
+                    active ? 'text-echo-green' : 'text-white'
+                  }`}>
                     {title}
                   </p>
-                  <p className="mt-1 text-xs text-stone-500">{desc}</p>
+                  <p className="mt-1 text-[10px] text-echo-muted font-body">{desc}</p>
                 </button>
               );
             })}
@@ -162,9 +108,9 @@ const MLIntake = ({ intake, onChange, onContinue }) => {
         <button
           disabled={!canContinue}
           onClick={onContinue}
-          className="mt-8 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-8 w-full px-4 py-3 text-[11px] font-ui font-semibold tracking-widest uppercase border border-echo-green text-echo-green bg-echo-green/10 hover:bg-echo-green/20 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Continue →
+          Continue
         </button>
       </div>
     </div>
