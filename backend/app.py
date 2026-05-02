@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from dashboard.session_manager import SessionManager
 from machine_learning.router import router as ml_router
+from sensors.ml_sensor import MLPredictionSensor
 import os
 import pandas as pd
 
@@ -90,16 +91,22 @@ def refresh_streams():
 # ════════════════════════════════════════════════════════════════════
 # RECORDING
 # ════════════════════════════════════════════════════════════════════
+from pydantic import BaseModel
+
+class RecordStartRequest(BaseModel):
+    file_path: str | None = None
+    format: str = "csv"  # "csv" or "xlsx"
+
 @app.post("/record/start")
-def start_recording():
-    session.start_recording()
+def start_recording(req: RecordStartRequest = RecordStartRequest()):
+    session.start_recording(file_path=req.file_path, fmt=req.format)
     return {"recording": True}
 
 
 @app.post("/record/stop")
 def stop_recording():
-    session.stop_recording()
-    return {"recording": False}
+    saved_path = session.stop_recording()
+    return {"recording": False, "saved_to": saved_path}
 
 # ════════════════════════════════════════════════════════════════════
 # WEBSOCKET
@@ -150,7 +157,72 @@ async def read_user_item(file: str):
         return columns
     except:
         return {"error": "Invalid file type"}, 400
-    
+
+
+# ════════════════════════════════════════════════════════════════════
+# ML SENSORS — load trained models as real-time prediction streams
+# ════════════════════════════════════════════════════════════════════
+
+_ml_sensors: dict[str, MLPredictionSensor] = {}
+
+
+class MLSensorStartRequest(BaseModel):
+    uid: str
+    name: str
+    source_name: str
+    model_path: str
+    source_type: str = ""
+    buffer_seconds: float = 2.0
+    process_interval: float = 0.1
+    sample_rate: float = 0.0   # 0 = irregular (predict-on-demand)
+
+
+@app.post("/ml-sensors/start")
+def start_ml_sensor(req: MLSensorStartRequest):
+    if req.uid in _ml_sensors:
+        return {"ok": True, "uid": req.uid, "note": "already running"}
+
+    sensor = MLPredictionSensor(
+        uid=req.uid,
+        name=req.name,
+        type="ML",
+        channels=1,           # adjusted automatically in _setup
+        sample_rate=req.sample_rate,
+        source_name=req.source_name,
+        source_type=req.source_type,
+        buffer_seconds=req.buffer_seconds,
+        process_interval=req.process_interval,
+        model_path=req.model_path,
+    )
+    sensor.start()
+    _ml_sensors[req.uid] = sensor
+    return {"ok": True, "uid": req.uid, "name": req.name}
+
+
+@app.delete("/ml-sensors/{uid}")
+def stop_ml_sensor(uid: str):
+    sensor = _ml_sensors.pop(uid, None)
+    if sensor is None:
+        return {"ok": False, "error": f"No ML sensor with uid '{uid}'"}
+    sensor.stop()
+    return {"ok": True, "uid": uid}
+
+
+@app.get("/ml-sensors")
+def list_ml_sensors():
+    return {
+        "sensors": [
+            {
+                "uid": uid,
+                "name": s.name,
+                "source_name": s.source_name,
+                "model_path": s.model_path,
+                "channels": s.channels,
+                "running": s._running,
+            }
+            for uid, s in _ml_sensors.items()
+        ]
+    }
 
 if __name__ == "__main__":
     import uvicorn

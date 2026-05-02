@@ -13,6 +13,14 @@ from pydantic import BaseModel, Field
 from typing import Any
 
 from .pipeline import execute
+from .model_workbench import (
+    MODEL_SPECS,
+    TrainRequest as WorkbenchTrainRequest,
+    get_dataset_columns,
+    get_dataset_profile,
+    clean_dataset,
+    train_model,
+)
 
 logger    = logging.getLogger(__name__)
 router    = APIRouter(prefix="/ml", tags=["ML"])
@@ -54,6 +62,34 @@ class PipelineSchema(BaseModel):
     train_node_id: str | None = None
 
 
+class ModelTrainSchema(BaseModel):
+    dataset_path: str
+    label_col: str
+    model_key: str
+    model_name: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+    test_size: float = 0.2
+    val_size: float = 0.1
+    random_state: int = 42
+    shuffle: bool = True
+    save_dir: str = ""   # optional override for output directory
+
+
+class DatasetColumnsSchema(BaseModel):
+    dataset_path: str
+
+
+class ColumnOpSchema(BaseModel):
+    col: str
+    action: str  # keep | drop | fill_mean | fill_median | fill_mode | fill_zero | drop_rows
+
+
+class CleanDatasetSchema(BaseModel):
+    dataset_path: str
+    drop_duplicates: bool = False
+    column_ops: list[ColumnOpSchema] = Field(default_factory=list)
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/pipeline/run")
@@ -66,6 +102,72 @@ async def run_pipeline(pipeline: PipelineSchema):
         return result
     except Exception as exc:
         logger.error("Pipeline execution failed: %s", exc)
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/workbench/models")
+async def list_workbench_models():
+    """List supported model types and editable parameter schemas."""
+    return {"models": MODEL_SPECS}
+
+
+@router.post("/workbench/profile")
+async def profile_dataset(body: DatasetColumnsSchema):
+    """Return per-column stats for the cleaning step."""
+    try:
+        return get_dataset_profile(body.dataset_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/workbench/clean")
+async def clean_dataset_endpoint(body: CleanDatasetSchema):
+    """Apply cleaning operations and return the path of the saved cleaned CSV."""
+    try:
+        result = clean_dataset(
+            body.dataset_path,
+            body.drop_duplicates,
+            [op.model_dump() for op in body.column_ops],
+        )
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/workbench/columns")
+async def get_workbench_columns(payload: DatasetColumnsSchema):
+    """Inspect a CSV and return available columns for label selection."""
+    try:
+        return get_dataset_columns(payload.dataset_path)
+    except Exception as exc:
+        logger.error("Dataset columns lookup failed: %s", exc)
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/workbench/train")
+async def train_workbench_model(payload: ModelTrainSchema):
+    """Train a single selected model directly from dataset + params."""
+    try:
+        req = WorkbenchTrainRequest(
+            dataset_path=payload.dataset_path,
+            label_col=payload.label_col,
+            model_key=payload.model_key,
+            model_name=payload.model_name,
+            params=payload.params,
+            test_size=payload.test_size,
+            val_size=payload.val_size,
+            random_state=payload.random_state,
+            shuffle=payload.shuffle,
+        )
+        _ensure_dirs()
+        out_dir = payload.save_dir.strip() if payload.save_dir.strip() else MODELS_DIR
+        return train_model(req, out_dir)
+    except Exception as exc:
+        logger.error("Workbench training failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc))
 
 

@@ -6,6 +6,7 @@ Stores splits on a shared context dict so downstream nodes can access them.
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer
 
 
 def run(config: dict, upstream):
@@ -60,6 +61,14 @@ def run(config: dict, upstream):
     else:
         X_train, y_train = X_trainval, y_trainval
         X_val,   y_val   = pd.DataFrame(), pd.Series(dtype=y.dtype)
+
+    # Impute NaN values (fit on train only to avoid data leakage)
+    imputer = SimpleImputer(strategy="mean")
+    X_train = pd.DataFrame(imputer.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
+    if len(X_val) > 0:
+        X_val = pd.DataFrame(imputer.transform(X_val), columns=X_val.columns, index=X_val.index)
+    if len(X_test) > 0:
+        X_test = pd.DataFrame(imputer.transform(X_test), columns=X_test.columns, index=X_test.index)
 
     # Package splits into a dict — downstream nodes receive this as "upstream"
     splits = {

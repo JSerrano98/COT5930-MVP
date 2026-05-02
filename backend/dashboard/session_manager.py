@@ -1,17 +1,108 @@
 """
 Session Manager:
 Manages LSL stream discovery, WebSocket client broadcasting,
-and optional Excel recording. Instantiated by the FastAPI app.
+and optional recording (CSV or Excel). Instantiated by the FastAPI app.
 """
 import asyncio
+import csv
 import json
 import logging
 import openpyxl
+import struct
 
 from pylsl import StreamInlet, resolve_streams
 from pathlib import Path
+from datetime import datetime
 
 log = logging.getLogger(__name__)
+
+
+class _XDFWriter:
+    """
+    Minimal XDF 1.0 writer (https://github.com/sccn/xdf/wiki/Specifications).
+    Buffers all samples in memory and writes the complete file on save().
+    Channel values are stored as float32.
+    """
+    _MAGIC = b'XDF:\x01\xff'
+
+    def __init__(self, streams: list[dict]):
+        self._stream_ids: dict[str, int] = {}
+        self._stream_infos: dict[str, dict] = {}
+        self._buffers: dict[str, list] = {}  # name -> [(ts, [values])]
+        # Pre-build fixed header bytes (magic + file header + stream headers)
+        self._header = bytearray(self._MAGIC)
+        self._header += self._make_chunk(
+            1, b'<?xml version="1.0"?><info><version>1.0</version></info>'
+        )
+        for i, s in enumerate(streams, start=1):
+            self._stream_ids[s['name']] = i
+            self._stream_infos[s['name']] = s
+            self._buffers[s['name']] = []
+            self._header += self._make_chunk(2, self._stream_header_bytes(i, s))
+
+    def add_sample(self, stream_name: str, timestamp: float, values: list):
+        if stream_name in self._buffers:
+            self._buffers[stream_name].append((timestamp, list(values)))
+
+    def save(self, path: Path):
+        buf = bytearray(self._header)
+        for name, samples in self._buffers.items():
+            if not samples:
+                continue
+            sid = self._stream_ids[name]
+            n_ch = self._stream_infos[name]['channels']
+            sample_bytes = bytearray()
+            for ts, vals in samples:
+                sample_bytes += struct.pack('B', 8)       # timestamp_bytes = 8
+                sample_bytes += struct.pack('<d', ts)     # timestamp (double)
+                for ci in range(n_ch):
+                    v = vals[ci] if ci < len(vals) else 0.0
+                    sample_bytes += struct.pack('<f', float(v))
+            buf += self._make_chunk(3, struct.pack('<I', sid) + bytes(sample_bytes))
+            first_ts, last_ts = samples[0][0], samples[-1][0]
+            footer = (
+                f'<?xml version="1.0"?><info>'
+                f'<first_timestamp>{first_ts}</first_timestamp>'
+                f'<last_timestamp>{last_ts}</last_timestamp>'
+                f'<sample_count>{len(samples)}</sample_count>'
+                f'<measured_srate>0</measured_srate></info>'
+            )
+            buf += self._make_chunk(6, struct.pack('<I', sid) + footer.encode())
+        path.write_bytes(bytes(buf))
+
+    @staticmethod
+    def _encode_varlen(n: int) -> bytes:
+        if n <= 0xFF:
+            return struct.pack('BB', 1, n)
+        if n <= 0xFFFFFFFF:
+            return struct.pack('<BI', 4, n)
+        return struct.pack('<BQ', 8, n)
+
+    def _make_chunk(self, tag: int, content: bytes) -> bytes:
+        body = struct.pack('<H', tag) + content
+        return self._encode_varlen(len(body)) + body
+
+    @staticmethod
+    def _stream_header_bytes(sid: int, s: dict) -> bytes:
+        ch_xml = ''.join(
+            f'<channel><label>{lbl}</label>'
+            f'<type>{s["type"]}</type>'
+            f'<unit>unknown</unit></channel>'
+            for lbl in s['channel_labels']
+        )
+        xml = (
+            f'<?xml version="1.0"?><info>'
+            f'<name>{s["name"]}</name>'
+            f'<type>{s["type"]}</type>'
+            f'<channel_count>{s["channels"]}</channel_count>'
+            f'<nominal_srate>{s["rate"]}</nominal_srate>'
+            f'<channel_format>float32</channel_format>'
+            f'<source_id>{s["name"]}</source_id>'
+            f'<desc><channels>{ch_xml}</channels></desc>'
+            f'</info>'
+        )
+        return struct.pack('<I', sid) + xml.encode()
+
 
 class SessionManager:
     def __init__(self):
@@ -21,10 +112,18 @@ class SessionManager:
         self._task: asyncio.Task | None = None
         self.update_rate = 120.  # Hz
 
-        # Recording
+        # Recording state
         self._recording = False
-        self._wb = openpyxl.Workbook()
-        self._wb.active.append(["TimeStamp", "StreamName", "Data"])
+        self._record_fmt: str = "csv"
+        self._record_path: Path | None = None
+        self._wb: openpyxl.Workbook | None = None
+        self._wb_sheet = None
+        self._csv_file = None
+        self._csv_writer = None
+        self._xdf: _XDFWriter | None = None
+        # Wide-format column map: stream_name -> start column index (0-based, after timestamp)
+        self._col_map: dict[str, int] = {}
+        self._col_headers: list[str] = []
 
     # ════════════════════════════════════════════════════════════════
     # SESSION LIFECYCLE
@@ -167,7 +266,7 @@ class SessionManager:
                 sample, timestamp = inlet.pull_sample(timeout=0.0)
                 if sample is not None:
                     if self._recording:
-                        self._excel_payload(timestamp, stream["name"], sample[0])
+                        self._record_sample(timestamp, stream["name"], sample)
 
                     payload = json.dumps({
                         "stream": stream["name"],
@@ -190,22 +289,112 @@ class SessionManager:
     # ════════════════════════════════════════════════════════════════
     # RECORDING
     # ════════════════════════════════════════════════════════════════
-    def start_recording(self):
+    def _default_recordings_dir(self) -> Path:
+        """Returns (and creates) the default recordings folder next to this package."""
+        p = Path(__file__).resolve().parent.parent / "recordings"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def start_recording(self, file_path: str | None = None, fmt: str = "csv"):
+        if self._recording:
+            return
+
+        fmt = fmt.lower().strip()
+        if fmt not in ("csv", "xlsx", "xdf"):
+            fmt = "csv"
+
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        ext = ".xlsx" if fmt == "xlsx" else ".xdf" if fmt == "xdf" else ".csv"
+
+        if file_path:
+            dest = Path(file_path)
+            # If caller gave a directory, auto-name the file inside it
+            if dest.is_dir() or not dest.suffix:
+                dest = dest / f"recording_{ts}{ext}"
+        else:
+            dest = self._default_recordings_dir() / f"recording_{ts}{ext}"
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        self._record_path = dest
+        self._record_fmt = fmt
+
+        # Build wide-format column layout from currently active streams
+        self._col_map = {}
+        self._col_headers = []
+        col_idx = 0
+        for s in self.inlets:
+            self._col_map[s["name"]] = col_idx
+            for lbl in s["channel_labels"]:
+                self._col_headers.append(lbl)
+            col_idx += s["channels"]
+
+        headers = ["timestamp"] + self._col_headers
+
+        if fmt == "xlsx":
+            self._wb = openpyxl.Workbook()
+            ws = self._wb.active
+            self._wb_sheet = ws
+            ws.append(headers)
+        elif fmt == "xdf":
+            self._xdf = _XDFWriter(self.list_streams())
+        else:
+            self._csv_file = open(dest, "w", newline="", encoding="utf-8")
+            self._csv_writer = csv.writer(self._csv_file)
+            self._csv_writer.writerow(headers)
+
         self._recording = True
-        log.info("Recording started")
+        log.info(f"Recording started → {dest} ({fmt})")
 
-    def stop_recording(self):
+    def stop_recording(self) -> str | None:
+        if not self._recording:
+            return None
+
         self._recording = False
-        log.info("Recording stopped")
+        saved = str(self._record_path) if self._record_path else None
 
-    def _excel_payload(self, timestamp, streamname, data):
-        self._wb.active.append([timestamp, streamname, data])
-        last_row = self._wb.active.max_row
-        self._wb.active.cell(row=last_row, column=3).number_format = '0.000000'
-        self._wb.save(self._create_path() + '/data3.xlsx')
+        if self._record_fmt == "xlsx" and self._wb:
+            try:
+                self._wb.save(self._record_path)
+            except Exception as e:
+                log.error(f"Failed to save xlsx: {e}")
+            self._wb = None
+            self._wb_sheet = None
+        elif self._record_fmt == "xdf" and self._xdf:
+            try:
+                self._xdf.save(self._record_path)
+            except Exception as e:
+                log.error(f"Failed to save xdf: {e}")
+            self._xdf = None
+        elif self._csv_file:
+            try:
+                self._csv_file.close()
+            except Exception:
+                pass
+            self._csv_file = None
+            self._csv_writer = None
 
-    def _create_path(self):
-        script_dir = Path(__file__).parent
-        path = script_dir / 'CSV'
-        path.mkdir(exist_ok=True)
-        return str(path)
+        self._record_path = None
+        log.info(f"Recording stopped. Saved to: {saved}")
+        return saved
+
+    def _record_sample(self, timestamp: float, stream_name: str, sample: list):
+        if not self._recording:
+            return
+        if self._record_fmt == "xdf" and self._xdf:
+            self._xdf.add_sample(stream_name, timestamp, sample)
+            return
+
+        # Build wide row: timestamp + one slot per channel across all streams
+        n_cols = len(self._col_headers)
+        row = [""] * (n_cols + 1)
+        row[0] = timestamp
+        col_start = self._col_map.get(stream_name)
+        if col_start is not None:
+            for i, val in enumerate(sample):
+                if col_start + i < n_cols:
+                    row[col_start + i + 1] = val
+
+        if self._record_fmt == "xlsx" and self._wb_sheet:
+            self._wb_sheet.append(row)
+        elif self._csv_writer:
+            self._csv_writer.writerow(row)
