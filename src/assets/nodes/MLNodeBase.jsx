@@ -3,11 +3,11 @@ import { Handle, Position } from 'reactflow';
 import { NodeResizeControl } from 'reactflow';
 
 const STATUS_STYLES = {
-  idle:    { dot: 'bg-slate-600',                label: 'Idle' },
-  ready:   { dot: 'bg-blue-400',                 label: 'Ready' },
-  running: { dot: 'bg-yellow-400 animate-pulse', label: 'Running' },
-  done:    { dot: 'bg-emerald-400',              label: 'Done' },
-  error:   { dot: 'bg-red-500',                  label: 'Error' },
+  idle:    { dot: 'bg-echo-dim',                          label: 'Idle' },
+  ready:   { dot: 'bg-echo-blue',                         label: 'Ready' },
+  running: { dot: 'bg-echo-green',                        label: 'Running', pulse: true },
+  done:    { dot: 'bg-echo-green',                        label: 'Done' },
+  error:   { dot: 'bg-red-500',                           label: 'Error' },
 };
 
 /**
@@ -81,22 +81,26 @@ const MLNodeBase = ({
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.idle;
 
   return (
-    <div className="flex flex-col bg-slate-900 border border-slate-700 w-full h-full relative">
+    <div className="flex flex-col bg-echo-surface border border-echo-border w-full h-full relative">
       {/* Handles live here — direct children of the relative root, not inside overflow:auto */}
       {handles}
 
       {/* Header / drag handle */}
-      <div className="ml-node-drag flex items-center gap-2 px-3 py-2 bg-slate-800 border-b border-slate-700 flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
-        <svg className="w-3 h-3 text-slate-600 shrink-0" fill="currentColor" viewBox="0 0 8 12">
+      <div className="ml-node-drag flex items-center gap-2 px-3 py-2 bg-echo-surface-2 border-b border-echo-border flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
+        <svg className="w-3 h-3 text-echo-dim shrink-0" fill="currentColor" viewBox="0 0 8 12">
           <circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/>
           <circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/>
           <circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/>
         </svg>
-        <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} title={s.label} />
-        <span className="text-[11px] font-semibold text-slate-200 tracking-wide truncate flex-1">{label}</span>
+        <span
+          className={`echo-circle w-2 h-2 shrink-0 ${s.dot}`}
+          title={s.label}
+          style={s.pulse ? { animation: 'echo-pulse 1.2s ease infinite' } : {}}
+        />
+        <span className="text-[11px] font-ui font-semibold text-white tracking-wide truncate flex-1">{label}</span>
         <button
           onClick={() => setCollapsed(c => !c)}
-          className="text-slate-500 hover:text-slate-200 transition-colors px-1 leading-none text-xs"
+          className="text-echo-dim hover:text-white transition-colors px-1 leading-none text-xs font-ui"
           title={collapsed ? 'Expand' : 'Collapse'}
         >
           {collapsed ? '▼' : '▲'}
@@ -104,7 +108,7 @@ const MLNodeBase = ({
         {onRemove && (
           <button
             onClick={onRemove}
-            className="text-slate-600 hover:text-red-400 transition-colors px-1 leading-none text-xs ml-1"
+            className="text-echo-dim hover:text-red-400 transition-colors px-1 leading-none text-xs ml-1 font-ui"
             title="Remove node"
           >
             ✕
@@ -127,7 +131,7 @@ const MLNodeBase = ({
           style={{ background: 'transparent', border: 'none' }}
         >
           <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize">
-            <svg viewBox="0 0 6 6" fill="none" className="w-full h-full text-slate-600">
+            <svg viewBox="0 0 6 6" fill="none" className="w-full h-full text-echo-dim">
               <path d="M6 0L6 6L0 6" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
           </div>

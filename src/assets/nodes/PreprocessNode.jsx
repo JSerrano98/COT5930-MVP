@@ -7,7 +7,7 @@ const FILTERS = ['none', 'bandpass', 'lowpass', 'highpass', 'notch'];
 
 const Row = ({ label, children }) => (
   <div className="mb-2">
-    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+    <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">{label}</p>
     {children}
   </div>
 );
@@ -16,7 +16,7 @@ const Select = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={e => onChange(e.target.value)}
-    className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
+    className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green"
   >
     {options.map(o => <option key={o} value={o}>{o}</option>)}
   </select>
@@ -25,7 +25,7 @@ const Select = ({ value, onChange, options }) => (
 const NumInput = ({ value, onChange, placeholder }) => (
   <input
     type="number"
-    className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
+    className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green"
     value={value}
     onChange={e => onChange(e.target.value)}
     placeholder={placeholder}
@@ -67,13 +67,13 @@ const PreprocessNode = ({ data }) => {
         <div className="flex gap-2 mb-2">
           {(filter === 'bandpass' || filter === 'highpass') && (
             <div className="flex-1">
-              <p className="text-[10px] text-slate-500 mb-1">Low Hz</p>
+              <p className="text-[10px] text-echo-muted mb-1">Low Hz</p>
               <NumInput value={lowFreq} onChange={v => { setLowFreq(v); update({ lowFreq: v }); }} placeholder="1" />
             </div>
           )}
           {(filter === 'bandpass' || filter === 'lowpass') && (
             <div className="flex-1">
-              <p className="text-[10px] text-slate-500 mb-1">High Hz</p>
+              <p className="text-[10px] text-echo-muted mb-1">High Hz</p>
               <NumInput value={highFreq} onChange={v => { setHighFreq(v); update({ highFreq: v }); }} placeholder="50" />
             </div>
           )}
@@ -89,14 +89,14 @@ const PreprocessNode = ({ data }) => {
       <div className="flex items-center gap-2 mt-1">
         <input type="checkbox" id="dropna" checked={dropNa}
           onChange={e => { setDropNa(e.target.checked); update({ dropNa: e.target.checked }); }}
-          className="accent-slate-400"
+          className="accent-echo-green"
         />
-        <label htmlFor="dropna" className="text-[11px] text-slate-400 select-none">Drop NaN rows</label>
+        <label htmlFor="dropna" className="text-[11px] text-echo-muted select-none">Drop NaN rows</label>
       </div>
 
       {data?.result && (
-        <div className="mt-3 pt-2 border-t border-slate-700">
-          <p className="text-[10px] text-emerald-400 font-mono">âœ“ {data.result.rows} rows after preprocessing</p>
+        <div className="mt-3 pt-2 border-t border-echo-border">
+          <p className="text-[10px] text-echo-green font-body">✓ {data.result.rows} rows after preprocessing</p>
         </div>
       )}
     </MLNodeBase>

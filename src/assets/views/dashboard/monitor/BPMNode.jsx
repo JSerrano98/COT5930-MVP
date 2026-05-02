@@ -55,12 +55,12 @@ const BPMNode = ({ stream, dataRef }) => {
   const color = zone.color;
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 select-none">
+    <div className="flex flex-col h-full bg-echo-base select-none">
 
       {/* Main BPM readout */}
       <div className="flex-1 flex flex-col items-center justify-center gap-1 px-4">
         {bpm == null ? (
-          <span className="text-[11px] font-mono text-slate-500">Awaiting data...</span>
+          <span className="text-[11px] font-mono text-echo-dim">Awaiting data...</span>
         ) : (
           <>
             {/* Large BPM number */}
@@ -72,13 +72,13 @@ const BPMNode = ({ stream, dataRef }) => {
             </div>
 
             {/* Unit label */}
-            <span className="text-[11px] font-mono text-slate-500 tracking-widest uppercase">
+            <span className="text-[11px] font-mono text-echo-dim tracking-widest uppercase">
               BPM
             </span>
 
             {/* Zone badge */}
             <span
-              className="mt-1 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-sm"
+              className="mt-1 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5"
               style={{ color, backgroundColor: `${color}1a`, border: `1px solid ${color}44` }}
             >
               {zone.label}
@@ -89,22 +89,22 @@ const BPMNode = ({ stream, dataRef }) => {
 
       {/* Stats bar */}
       {bpm != null && (
-        <div className="flex items-center justify-around px-4 py-2 border-t border-slate-800 text-[10px] font-mono">
+        <div className="flex items-center justify-around px-4 py-2 border-t border-echo-border text-[10px] font-mono">
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-slate-500 uppercase tracking-widest text-[8px]">Min</span>
-            <span className="text-slate-300">{min ?? '–'}</span>
+            <span className="text-echo-dim uppercase tracking-widest text-[8px]">Min</span>
+            <span className="text-echo-muted">{min ?? '–'}</span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-slate-500 uppercase tracking-widest text-[8px]">Avg</span>
-            <span className="text-slate-300">{avg ?? '–'}</span>
+            <span className="text-echo-dim uppercase tracking-widest text-[8px]">Avg</span>
+            <span className="text-echo-muted">{avg ?? '–'}</span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-slate-500 uppercase tracking-widest text-[8px]">Max</span>
-            <span className="text-slate-300">{max ?? '–'}</span>
+            <span className="text-echo-dim uppercase tracking-widest text-[8px]">Max</span>
+            <span className="text-echo-muted">{max ?? '–'}</span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-slate-500 uppercase tracking-widest text-[8px]">Window</span>
-            <span className="text-slate-300">{HISTORY_S}s</span>
+            <span className="text-echo-dim uppercase tracking-widest text-[8px]">Window</span>
+            <span className="text-echo-muted">{HISTORY_S}s</span>
           </div>
         </div>
       )}

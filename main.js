@@ -221,17 +221,14 @@ ipcMain.handle('dialog:pickFolder', async (_e, defaultPath) => {
 })
 
 ipcMain.handle('recording:defaultPath', () => {
-  const p = path.join(app.getPath('documents'), 'ECHO Recordings')
+  const p = path.join(app.getPath('documents'), 'ECHO', 'Session Recordings')
+  try { fs.mkdirSync(p, { recursive: true }) } catch { /* ignore */ }
   return p
 })
 
 ipcMain.handle('models:defaultPath', () => {
-  const p = path.join(app.getPath('documents'), 'ECHO Trained Models')
-  try {
-    fs.mkdirSync(p, { recursive: true })
-  } catch {
-    // Ignore folder creation failures; renderer can still use the path manually.
-  }
+  const p = path.join(app.getPath('documents'), 'ECHO', 'Trained Models')
+  try { fs.mkdirSync(p, { recursive: true }) } catch { /* ignore */ }
   return p
 })
 
@@ -303,8 +300,8 @@ function buildNativeSplashHtml() {
       .spinner {
         width: 34px;
         height: 34px;
-        border: 2px solid #d6d3d1;
-        border-top-color: #10b981;
+        border: 2px solid rgba(255, 122, 0, 0.25);
+        border-top-color: #FF7A00;
         border-radius: 9999px;
         animation: spin 0.8s linear infinite;
       }

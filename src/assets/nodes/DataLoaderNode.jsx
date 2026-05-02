@@ -29,7 +29,7 @@ const DataLoaderNode = ({ data }) => {
     >
       {/* Source selector */}
       <div className="mb-3">
-        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Source</p>
+        <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">Source</p>
         <div className="flex gap-1 flex-wrap">
           {SOURCES.map(s => (
             <button
@@ -37,8 +37,8 @@ const DataLoaderNode = ({ data }) => {
               onClick={() => { setSource(s.key); update({ source: s.key }); }}
               className={`px-2 py-1 text-[10px] font-semibold border transition-colors ${
                 source === s.key
-                  ? 'bg-slate-600 border-slate-500 text-white'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                  ? 'bg-echo-green/20 border-echo-green text-echo-green'
+                  : 'bg-echo-surface-2 border-echo-border text-echo-muted hover:text-white'
               }`}
             >
               {s.label}
@@ -50,16 +50,16 @@ const DataLoaderNode = ({ data }) => {
       {source === 'csv' && (
         <>
           <div className="mb-2">
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">File Path</p>
+            <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">File Path</p>
             <div className="flex gap-1">
               <input
-                className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500 min-w-0"
+                className="flex-1 bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green min-w-0"
                 placeholder="data/recordings/session.csv"
                 value={path}
                 onChange={e => { setPath(e.target.value); update({ path: e.target.value }); }}
               />
               <button
-                className="px-2 py-1 text-[10px] font-semibold bg-slate-700 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-600 transition-colors whitespace-nowrap"
+                className="px-2 py-1 text-[10px] font-semibold bg-echo-surface-2 border border-echo-border text-echo-muted hover:text-white hover:bg-echo-surface transition-colors whitespace-nowrap"
                 onClick={async () => {
                   try {
                     const picked = await window.echo.pickFile({
@@ -79,9 +79,9 @@ const DataLoaderNode = ({ data }) => {
             </div>
           </div>
           <div className="mb-2">
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Delimiter</p>
+            <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">Delimiter</p>
             <input
-              className="w-24 bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
+              className="w-24 bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green"
               value={sep}
               onChange={e => { setSep(e.target.value); update({ sep: e.target.value }); }}
             />
@@ -91,9 +91,9 @@ const DataLoaderNode = ({ data }) => {
 
       {source === 'recording' && (
         <div className="mb-2">
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Session Name</p>
+          <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">Session Name</p>
           <input
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
+            className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green"
             placeholder="session_2024_01_01"
             value={path}
             onChange={e => { setPath(e.target.value); update({ path: e.target.value }); }}
@@ -102,9 +102,9 @@ const DataLoaderNode = ({ data }) => {
       )}
 
       <div className="mb-1">
-        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Label Column</p>
+        <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">Label Column</p>
         <input
-          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-2 py-1 focus:outline-none focus:border-slate-500"
+          className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-2 py-1 focus:outline-none focus:border-echo-green"
           placeholder="label"
           value={label}
           onChange={e => { setLabel(e.target.value); update({ label: e.target.value }); }}
@@ -112,8 +112,8 @@ const DataLoaderNode = ({ data }) => {
       </div>
 
       {data?.result && (
-        <div className="mt-3 pt-2 border-t border-slate-700">
-          <p className="text-[10px] text-emerald-400 font-mono">
+        <div className="mt-3 pt-2 border-t border-echo-border">
+          <p className="text-[10px] text-echo-green font-body">
             âœ“ {data.result.rows} rows Â· {data.result.cols} cols
           </p>
         </div>

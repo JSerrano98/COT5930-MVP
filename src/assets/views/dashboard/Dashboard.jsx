@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { SIGNAL_COLORS } from './constants';
 import { useAlerts } from '../../context/AlertContext';
-import DashboardHeader from './DashboardHeader';
 import DashboardCanvas from './DashboardCanvas';
 import DashboardFooter from './DashboardFooter';
 import DashboardNodePanel from './DashboardNodePanel';
@@ -149,25 +148,13 @@ const Dashboard = () => {
     setMonitors((prev) => prev.map((m) => m.id === id ? { ...m, ...patch } : m));
 
   return (
-    <div className="w-full h-screen bg-slate-950 flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-echo-base flex flex-col overflow-hidden">
       <style>{`
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        ::-webkit-scrollbar-thumb { background: #2E4057; }
+        ::-webkit-scrollbar-thumb:hover { background: #FF7A00; }
       `}</style>
-
-      <DashboardHeader
-        connected={connected}
-        streams={streams}
-        loading={loading}
-        recording={recording}
-        onRecordClick={handleRecordClick}
-        onRefresh={refreshStreams}
-      />
 
       <div className="flex flex-1 overflow-hidden">
         <DashboardNodePanel
@@ -179,6 +166,11 @@ const Dashboard = () => {
           sessionRunning={sessionRunning}
           collapsed={panelCollapsed}
           onToggle={() => setPanelCollapsed(v => !v)}
+          connected={connected}
+          loading={loading}
+          recording={recording}
+          onRecordClick={handleRecordClick}
+          onRefresh={refreshStreams}
         />
 
         <DashboardCanvas

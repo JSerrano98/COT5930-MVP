@@ -17,7 +17,7 @@ const AppLayout = () => {
   const isML        = pathname === '/ml';
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-echo-base">
       <div className="flex-1 overflow-y-auto relative">
         {/* Dashboard is always mounted — visibility toggled so WS/state persists */}
         <div style={{ display: isDashboard ? 'flex' : 'none', width: '100%', height: '100%' }}>

@@ -86,7 +86,7 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
   const onConnect = useCallback((params) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#c9cdd4' }}>
+    <div style={{ width: '100%', height: '100%', background: '#E8ECF0' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -106,7 +106,7 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
         nodesConnectable={false}
         elementsSelectable
       >
-        <Background color="#1e293b" gap={16} />
+        <Background variant="dots" color="#8A9DB5" gap={24} size={1.5} />
         <Controls />
       </ReactFlow>
     </div>

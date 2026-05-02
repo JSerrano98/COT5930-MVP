@@ -99,24 +99,24 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   };
 
   return (
-    <div className="h-full w-full overflow-auto bg-slate-900 p-2 text-slate-200">
+    <div className="h-full w-full overflow-auto bg-echo-surface p-2 text-white">
       <div className="space-y-2">
         <label className="block">
-          <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">Model Name</p>
+          <p className="mb-1 text-[10px] uppercase tracking-widest text-echo-muted">Model Name</p>
           <input
             value={monitor.sensorName || ''}
             onChange={(e) => onPatch({ sensorName: e.target.value })}
             placeholder="ML_Stress_Predictor"
-            className="w-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200 outline-none focus:border-slate-400"
+            className="w-full border border-echo-border bg-echo-surface-2 px-2 py-1 text-xs text-white outline-none focus:border-echo-green"
           />
         </label>
 
         <label className="block">
-          <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">Source Stream</p>
+          <p className="mb-1 text-[10px] uppercase tracking-widest text-echo-muted">Source Stream</p>
           <select
             value={monitor.sourceName || ''}
             onChange={(e) => onPatch({ sourceName: e.target.value })}
-            className="w-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200 outline-none focus:border-slate-400"
+            className="w-full border border-echo-border bg-echo-surface-2 px-2 py-1 text-xs text-white outline-none focus:border-echo-green"
           >
             <option value="">Select source stream…</option>
             {streams.map((s) => (
@@ -126,24 +126,24 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
         </label>
 
         <label className="block">
-          <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">Model File (.pkl)</p>
+          <p className="mb-1 text-[10px] uppercase tracking-widest text-echo-muted">Model File (.pkl)</p>
           <div className="flex gap-1">
             <input
               value={monitor.modelPath || ''}
               onChange={(e) => onPatch({ modelPath: e.target.value })}
               placeholder="path/to/model.pkl"
-              className="min-w-0 flex-1 border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200 outline-none focus:border-slate-400"
+              className="min-w-0 flex-1 border border-echo-border bg-echo-surface-2 px-2 py-1 text-xs text-white outline-none focus:border-echo-green"
             />
             {!!window.echo?.pickFile && (
               <button
                 onClick={pickModel}
-                className="border border-slate-600 bg-slate-800 px-2 py-1 text-[10px] font-semibold tracking-wider text-slate-300 hover:border-slate-400 hover:text-white"
+                className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-muted hover:border-echo-green hover:text-white"
               >
                 BROWSE
               </button>
             )}
           </div>
-          <p className="mt-1 text-[10px] text-slate-500">Default folder: Documents/ECHO Trained Models</p>
+          <p className="mt-1 text-[10px] text-echo-muted">Default folder: Documents/ECHO Trained Models</p>
         </label>
 
         <div className="flex gap-1 pt-1">
@@ -151,7 +151,7 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
             <button
               onClick={startModelSensor}
               disabled={busy}
-              className="flex-1 border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
+              className="flex-1 flex-1 border border-echo-green/60 bg-echo-green/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-green hover:bg-echo-green/20 disabled:opacity-50"
             >
               {busy ? 'STARTING…' : 'START MODEL'}
             </button>
@@ -168,10 +168,10 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
 
         {error && <p className="text-[10px] text-red-400">{error}</p>}
 
-        <div className="mt-2 border-t border-slate-700 pt-2 text-[11px] text-slate-400">
-          <p>Prediction: <span className="font-mono text-slate-200">{prediction ?? '--'}</span></p>
-          <p>Confidence: <span className="font-mono text-slate-200">{confidence ?? '--'}</span></p>
-          <p className="mt-1 text-[10px] text-slate-500">Stream: {streamName || 'Not started'}</p>
+        <div className="mt-2 border-t border-echo-border pt-2 text-[11px] text-echo-muted">
+          <p>Prediction: <span className="font-mono text-white">{prediction ?? '--'}</span></p>
+          <p>Confidence: <span className="font-mono text-white">{confidence ?? '--'}</span></p>
+          <p className="mt-1 text-[10px] text-echo-muted">Stream: {streamName || 'Not started'}</p>
         </div>
       </div>
     </div>

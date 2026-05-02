@@ -19,9 +19,10 @@ const ICONS = {
 };
 
 const STYLES = {
-  error:   'bg-slate-900 border-red-500   text-red-400',
-  warning: 'bg-slate-900 border-yellow-500 text-yellow-400',
-  info:    'bg-slate-900 border-blue-500   text-blue-400',
+  error:   'bg-echo-surface border-red-500   text-red-400',
+  warning: 'bg-echo-surface border-echo-green text-echo-green',
+  info:    'bg-echo-surface border-echo-blue  text-echo-blue',
+  success: 'bg-echo-surface border-echo-green text-echo-green',
 };
 
 const AlertOverlay = () => {
@@ -38,18 +39,18 @@ const AlertOverlay = () => {
         <div
           key={alert.id}
           className={`pointer-events-auto flex gap-3 px-3 py-2.5 border-l-2 shadow-lg ${STYLES[alert.type] ?? STYLES.error}`}
-          style={{ animation: 'slideIn 0.2s ease' }}
+          style={{ animation: 'echo-slide-in 0.2s ease' }}
         >
           {ICONS[alert.type] ?? ICONS.error}
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold leading-tight">{alert.title}</p>
+            <p className="text-[11px] font-ui font-semibold leading-tight tracking-wide">{alert.title}</p>
             {alert.message && (
-              <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{alert.message}</p>
+              <p className="text-[10px] text-echo-muted mt-0.5 leading-snug font-body">{alert.message}</p>
             )}
           </div>
           <button
             onClick={() => dismiss(alert.id)}
-            className="text-slate-600 hover:text-slate-300 transition-colors text-xs leading-none flex-shrink-0 self-start mt-0.5"
+            className="text-echo-dim hover:text-white transition-colors text-xs leading-none flex-shrink-0 self-start mt-0.5 font-ui"
             aria-label="Dismiss"
           >
             ✕
@@ -57,7 +58,7 @@ const AlertOverlay = () => {
         </div>
       ))}
       <style>{`
-        @keyframes slideIn {
+        @keyframes echo-slide-in {
           from { opacity: 0; transform: translateX(16px); }
           to   { opacity: 1; transform: translateX(0); }
         }

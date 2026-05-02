@@ -63,27 +63,40 @@ const SplashScreen = ({ onReady }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-100"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-echo-surface"
       style={{
         transition: `opacity ${FADE_MS}ms ease`,
         opacity: fading ? 0 : 1,
         pointerEvents: fading ? 'none' : 'all',
       }}
     >
-      <div className="mb-8 flex flex-col items-center gap-1">
+      {/* Corner accent lines */}
+      <div className="absolute top-0 left-0 w-16 h-16 border-t-2 border-l-2 border-echo-green" />
+      <div className="absolute top-0 right-0 w-16 h-16 border-t-2 border-r-2 border-echo-green" />
+      <div className="absolute bottom-0 left-0 w-16 h-16 border-b-2 border-l-2 border-echo-green" />
+      <div className="absolute bottom-0 right-0 w-16 h-16 border-b-2 border-r-2 border-echo-green" />
+
+      <div className="mb-8 flex flex-col items-center gap-2">
         <h1
-          className="text-7xl tracking-[0.08em] text-stone-900"
-          style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+          className="text-[5.5rem] leading-none tracking-[0.12em] text-white font-title"
         >
           ECHO
         </h1>
-        <p className="text-xs uppercase tracking-[0.2em] text-stone-500">
+        <div className="w-full h-px bg-echo-border" />
+        <p className="text-[0.6rem] uppercase tracking-[0.3em] text-echo-muted font-ui">
           Enhanced Cognitive Human Operations
         </p>
       </div>
 
-      <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-stone-300 border-t-emerald-500" />
-      <p className="text-sm text-stone-500">{status}</p>
+      <div
+        className="mb-4 h-8 w-8 border-2"
+        style={{
+          animation: 'echo-spin 0.8s linear infinite',
+          borderColor: 'rgba(255, 122, 0, 0.25)',
+          borderTopColor: '#FF7A00', 
+        }}
+      />
+      <p className="text-xs tracking-widest uppercase text-echo-dim font-ui">{status}</p>
     </div>
   );
 };

@@ -34,24 +34,24 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
                          `Poor (${latencyMs} ms)`;
 
   return (
-  <div className="flex flex-col bg-slate-900 border border-slate-700 overflow-hidden w-full h-full">
+  <div className="flex flex-col bg-echo-surface border border-echo-border overflow-hidden w-full h-full">
 
     {/* Header — drag handle */}
-    <div className="monitor-drag flex items-center gap-2 px-3 py-1.5 border-b border-slate-700 bg-slate-800 flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
+    <div className="monitor-drag flex items-center gap-2 px-3 py-1.5 border-b border-echo-border bg-echo-surface flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
 
       {/* Drag grip icon */}
-      <svg className="w-3 h-3 text-slate-600 flex-shrink-0" fill="currentColor" viewBox="0 0 8 12">
+      <svg className="w-3 h-3 text-echo-dim flex-shrink-0" fill="currentColor" viewBox="0 0 8 12">
         <circle cx="2" cy="2"  r="1"/><circle cx="6" cy="2"  r="1"/>
         <circle cx="2" cy="6"  r="1"/><circle cx="6" cy="6"  r="1"/>
         <circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/>
       </svg>
 
-      <span className="text-[11px] font-semibold text-slate-200 tracking-wide truncate flex-1">
+      <span className="text-[11px] font-semibold text-white tracking-wide truncate flex-1">
         {stream ? stream.name : 'Unassigned'}
       </span>
 
       {nodeType && (
-        <span className="text-[9px] font-bold tracking-widest text-slate-500 flex-shrink-0">
+        <span className="text-[9px] font-bold tracking-widest text-echo-dim flex-shrink-0">
           {NODE_TYPE_LABELS[nodeType] ?? nodeType.toUpperCase()}
         </span>
       )}
@@ -66,7 +66,7 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
             className="sr-only"
           />
           <span
-            className="block w-3 h-3 border border-slate-600 hover:border-slate-400 transition-colors"
+            className="block w-3 h-3 border border-echo-border hover:border-echo-green transition-colors"
             style={{ backgroundColor: lineColor || '#07dd96' }}
           />
         </label>
@@ -75,7 +75,7 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
       <button
         onClick={onRemove}
         onMouseDown={e => e.stopPropagation()} // don't trigger drag
-        className="text-slate-600 hover:text-red-500 transition-colors text-xs leading-none flex-shrink-0 font-mono"
+        className="text-echo-dim hover:text-red-500 transition-colors text-xs leading-none flex-shrink-0 font-mono"
         aria-label="Remove monitor"
       >
         ✕
@@ -86,14 +86,14 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
     <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
 
     {/* Footer */}
-    <div className="flex items-center justify-between px-2 py-0.5 border-t border-slate-700 bg-slate-800 flex-shrink-0 select-none">
+    <div className="flex items-center justify-between px-2 py-0.5 border-t border-echo-border bg-echo-surface flex-shrink-0 select-none">
       <span
         title={latencyLabel}
-        className="block w-2 h-2 rounded-full transition-colors duration-500"
+        className="block w-2 h-2 echo-circle transition-colors duration-500"
         style={{ backgroundColor: latencyColor }}
       />
       <NodeResizeControl minWidth={200} minHeight={150} position="bottom-right" style={{ background: 'transparent', border: 'none', width: 'auto', height: 'auto', right: 0, bottom: 0 }}>
-        <svg className="w-3 h-3 text-slate-500 hover:text-slate-300 cursor-se-resize transition-colors" viewBox="0 0 10 10" fill="currentColor">
+        <svg className="w-3 h-3 text-echo-dim hover:text-white cursor-se-resize transition-colors" viewBox="0 0 10 10" fill="currentColor">
           <circle cx="3" cy="9" r="1"/><circle cx="6" cy="9" r="1"/><circle cx="9" cy="9" r="1"/>
           <circle cx="6" cy="6" r="1"/><circle cx="9" cy="6" r="1"/>
           <circle cx="9" cy="3" r="1"/>
