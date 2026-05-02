@@ -28,6 +28,12 @@ import importlib
 import pkgutil
 import time
 import sys
+from pathlib import Path
+
+# Ensure `backend/` is on sys.path when invoked as `python ./sensors/start_all_dummy.py`.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from sensors.sensor import DummySensor
 import sensors.dummy as dummy_pkg

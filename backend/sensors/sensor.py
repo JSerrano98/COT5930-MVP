@@ -59,11 +59,9 @@ class Sensor(ABC):
         if self.channels < 1:
             raise ValueError("There must be at least 1 channel for a signal")
 
-        if self.sample_rate < 1: # TODO: Ask Dr.Vogl pref on bare min sample rate
-                                 # NOTE: May want to allow 0 for derived sensors that only update on new source data,
-                                 # Specifically for implementing sub-class for classification models that have binary output, 
-                                 # continuous output not needed and would just be 0 eatting CPU for no reason.
-            raise ValueError("Sample Rate must be at least 1") 
+        # LSL nominal_srate=0 means irregular/event-driven stream timing.
+        if self.sample_rate < 0:
+            raise ValueError("Sample Rate must be >= 0 (use 0 for irregular streams)")
 
         if self.channel_labels is None:
             self.channel_labels = [
