@@ -15,7 +15,10 @@ Most importantly allows the computed values to be recorded by LSL.
 
 import time
 import threading
+import pickle
+import os
 import numpy as np
+import pandas as pd
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -237,6 +240,7 @@ class DerivedSensor(Sensor):
     _buf_idx: int = field(init=False, default=0)
     _buf_full: bool = field(init=False, default=False)
     source_rate: float = field(init=False, default=0)
+    _source_channel_labels: list[str] = field(init=False, default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
@@ -266,6 +270,16 @@ class DerivedSensor(Sensor):
         ...
 
     # Base class hooks
+    def _extract_channel_labels(self, info) -> list[str]:
+        labels = []
+        ch = info.desc().child("channels").child("channel")
+        while not ch.empty():
+            label = ch.child_value("label")
+            if label:
+                labels.append(label)
+            ch = ch.next_sibling()
+        return labels
+
     def _setup(self):
         print(f"[{self.name}] Resolving source stream '{self.source_name}'...")
         streams = resolve_byprop('name', self.source_name, timeout=5.0)
@@ -279,11 +293,21 @@ class DerivedSensor(Sensor):
         info = streams[0]
         self.source_rate = info.nominal_srate()
         source_channels = info.channel_count()
+        labels = self._extract_channel_labels(info)
+        if len(labels) != source_channels:
+            labels = [f"{self.source_name}_ch{i+1}" for i in range(source_channels)]
+        self._source_channel_labels = labels
 
         self._inlet = StreamInlet(info, max_buflen=int(self.buffer_seconds + 1))
         self._inlet.open_stream()
 
-        buf_len = int(self.source_rate * self.buffer_seconds)
+        if self.source_rate > 0:
+            buf_len = int(self.source_rate * self.buffer_seconds)
+        else:
+            # Irregular streams report nominal_srate=0; keep a bounded rolling
+            # window based on process cadence so derived sensors still function.
+            buf_len = int(self.buffer_seconds / self.process_interval)
+        buf_len = max(1, buf_len)
         self._buffer = np.zeros((buf_len, source_channels))
         self._buf_idx = 0
         self._buf_full = False
@@ -366,15 +390,312 @@ class DummySensor(Sensor):
 # ════════════════════════════════════════════════════════════════════
 @dataclass
 class MLSensor(DerivedSensor):
-    # TODO: Implement a base class for ML-based derived sensors
-    #  that load a pre-trained model and apply it to the buffer.
-    pass
+    """
+    Generic ML-derived LSL sensor.
+
+    Loads a serialized model bundle from a .pkl file, subscribes to an input
+    LSL stream, runs inference on the latest sample window, and publishes
+    predictions as its own LSL outlet.
+    """
+    model_path: str = ""
+    source_names: list[str] = field(default_factory=list)
+    feature_aliases: dict[str, str] = field(default_factory=dict)
+
+    _model: object = field(init=False, default=None)
+    _task: str = field(init=False, default="")
+    _feature_cols: list[str] = field(init=False, default_factory=list)
+    _has_proba: bool = field(init=False, default=False)
+    _warned_feature_shape: bool = field(init=False, default=False)
+    _warned_feature_mapping: bool = field(init=False, default=False)
+    _last_prediction_error: str = field(init=False, default="")
+    _multi_source_mode: bool = field(init=False, default=False)
+    _inlets_meta: list[dict] = field(init=False, default_factory=list)
+    _latest_by_source: dict[str, np.ndarray | None] = field(init=False, default_factory=dict)
+
+    def __post_init__(self):
+        if not self.model_path:
+            raise ValueError("model_path is required for MLSensor")
+
+        if self.source_names and not self.source_name:
+            object.__setattr__(self, 'source_name', self.source_names[0])
+
+        if not self.source_names and self.source_name:
+            object.__setattr__(self, 'source_names', [self.source_name])
+
+        aliases = {
+            str(k): str(v)
+            for k, v in dict(self.feature_aliases or {}).items()
+            if str(k).strip() and str(v).strip()
+        }
+        object.__setattr__(self, 'feature_aliases', aliases)
+
+        # Placeholder until model is loaded and output channels are inferred.
+        if self.channels < 1:
+            object.__setattr__(self, 'channels', 1)
+
+        super().__post_init__()
+
+    def _resolve_model_path(self) -> str:
+        resolved = self.model_path
+        if not os.path.isabs(resolved):
+            backend_root = os.path.dirname(os.path.dirname(__file__))
+            resolved = os.path.normpath(os.path.join(backend_root, resolved))
+        if not os.path.exists(resolved):
+            raise FileNotFoundError(f"Model file not found: {resolved}")
+        return resolved
+
+    def _load_model(self):
+        resolved = self._resolve_model_path()
+        with open(resolved, "rb") as f:
+            bundle = pickle.load(f)
+
+        self._model = bundle["model"]
+        self._task = str(bundle.get("task", "regression")).strip().lower()
+        self._feature_cols = bundle.get("feature_cols", []) or []
+        self._has_proba = (
+            self._task == "classification"
+            and hasattr(self._model, "predict_proba")
+        )
+
+        print(
+            f"[{self.name}] Loaded '{self._task}' model "
+            f"({len(self._feature_cols)} features) from {resolved}"
+        )
+
+    def _setup(self):
+        self._load_model()
+
+        # One output for prediction, optional second for confidence.
+        n_channels = 2 if self._has_proba else 1
+        object.__setattr__(self, 'channels', n_channels)
+        labels = ["prediction"] + (["confidence"] if self._has_proba else [])
+        object.__setattr__(self, 'channel_labels', labels)
+
+        requested = []
+        for name in self.source_names:
+            s = str(name).strip()
+            if s and s not in requested:
+                requested.append(s)
+
+        if len(requested) <= 1:
+            object.__setattr__(self, 'source_names', requested or [self.source_name])
+            self._multi_source_mode = False
+            super()._setup()
+            return
+
+        self._multi_source_mode = True
+        self._inlets_meta = []
+        self._latest_by_source = {}
+
+        print(f"[{self.name}] Resolving source streams: {', '.join(requested)}")
+
+        max_rate = 0.0
+        for source in requested:
+            streams = resolve_byprop('name', source, timeout=5.0)
+            if self.source_type:
+                streams = [s for s in streams if s.type() == self.source_type]
+
+            if not streams:
+                raise RuntimeError(f"No LSL stream found with name '{source}'")
+
+            info = streams[0]
+            inlet = StreamInlet(info, max_buflen=int(self.buffer_seconds + 1))
+            inlet.open_stream()
+
+            labels = self._extract_channel_labels(info)
+            channels = info.channel_count()
+            if len(labels) != channels:
+                labels = [f"{source}_ch{i+1}" for i in range(channels)]
+
+            self._inlets_meta.append({
+                "name": source,
+                "inlet": inlet,
+                "channels": channels,
+                "labels": labels,
+                "rate": float(info.nominal_srate()),
+            })
+            self._latest_by_source[source] = None
+            max_rate = max(max_rate, float(info.nominal_srate()))
+
+            print(
+                f"[{self.name}] Connected to '{source}' "
+                f"({channels}ch @ {info.nominal_srate()}Hz)"
+            )
+
+        object.__setattr__(self, 'source_rate', max_rate)
+        object.__setattr__(self, 'source_names', requested)
+
+    def _extract_channel_labels(self, info) -> list[str]:
+        return super()._extract_channel_labels(info)
+
+    def _predict_from_features(self, features: np.ndarray) -> list[float] | None:
+        vec = np.asarray(features, dtype=float).reshape(-1)
+
+        # Preserve feature names for models/pipelines trained with named columns.
+        if self._feature_cols and len(self._feature_cols) == vec.size:
+            X = pd.DataFrame([vec], columns=self._feature_cols)
+        else:
+            X = vec.reshape(1, -1)
+
+        try:
+            prediction = float(self._model.predict(X)[0])
+            self._last_prediction_error = ""
+            if self._has_proba:
+                proba = self._model.predict_proba(X)[0]
+                confidence = float(np.max(proba))
+                return [prediction, confidence]
+            return [prediction]
+        except Exception as exc:
+            msg = str(exc)
+            if msg != self._last_prediction_error:
+                print(f"[{self.name}] Prediction error: {msg}")
+                self._last_prediction_error = msg
+            return None
+
+    def _assemble_features(self, values: np.ndarray, label_to_value: dict[str, float]) -> np.ndarray | None:
+        n_features = len(self._feature_cols) if self._feature_cols else int(values.size)
+        if n_features <= 0:
+            return None
+
+        if self._feature_cols:
+            assembled = []
+            missing = []
+            for feature in self._feature_cols:
+                lookup = self.feature_aliases.get(feature, feature)
+                if lookup in label_to_value:
+                    assembled.append(label_to_value[lookup])
+                else:
+                    missing.append(feature)
+
+            if not missing:
+                return np.asarray(assembled, dtype=float)
+
+            if not self._warned_feature_mapping:
+                print(
+                    f"[{self.name}] Feature labels not fully matched ({len(missing)} missing). "
+                    f"Using ordered fallback."
+                )
+                self._warned_feature_mapping = True
+
+        arr = np.asarray(values, dtype=float)
+        if arr.size < n_features:
+            return None
+        return arr[:n_features]
+
+    def _loop_body(self):
+        if not self._multi_source_mode:
+            return super()._loop_body()
+
+        saw_new = False
+        for meta in self._inlets_meta:
+            samples, _ = meta["inlet"].pull_chunk(timeout=0.0)
+            if samples:
+                self._latest_by_source[meta["name"]] = np.asarray(samples[-1], dtype=float)
+                saw_new = True
+
+        if not saw_new:
+            time.sleep(self.process_interval)
+            return
+
+        latest = []
+        labels = []
+        label_to_value: dict[str, float] = {}
+
+        for meta in self._inlets_meta:
+            sample = self._latest_by_source.get(meta["name"])
+            if sample is None:
+                return
+
+            channels = int(meta["channels"])
+            sample = sample[:channels]
+            latest.extend(sample.tolist())
+
+            for idx, value in enumerate(sample.tolist()):
+                label = meta["labels"][idx] if idx < len(meta["labels"]) else f"{meta['name']}_ch{idx+1}"
+                labels.append(label)
+                if label not in label_to_value:
+                    label_to_value[label] = float(value)
+                prefixed = f"{meta['name']}::{label}"
+                if prefixed not in label_to_value:
+                    label_to_value[prefixed] = float(value)
+
+        features = self._assemble_features(np.asarray(latest, dtype=float), label_to_value)
+        if features is None:
+            return
+
+        result = self._predict_from_features(features)
+        if result is not None:
+            self.push(result)
+
+    def process(self, buffer: np.ndarray) -> list[float] | None:
+        if buffer is None or len(buffer) == 0:
+            return None
+
+        sample = buffer[-1]
+        n_features = len(self._feature_cols) if self._feature_cols else sample.shape[0]
+
+        label_to_value = {
+            self._source_channel_labels[idx]: float(sample[idx])
+            for idx in range(min(len(self._source_channel_labels), sample.shape[0]))
+        }
+        for idx, label in enumerate(self._source_channel_labels[:sample.shape[0]]):
+            label_to_value[f"{self.source_name}::{label}"] = float(sample[idx])
+
+        # Prefer latest-sample features when dimensions already match.
+        if sample.shape[0] >= n_features:
+            features = sample[:n_features]
+        else:
+            # If the model expects more features than a single source sample has,
+            # build a feature vector from the rolling buffer (oldest -> newest).
+            flat = buffer.reshape(-1)
+            if flat.size < n_features:
+                if not self._warned_feature_shape:
+                    print(
+                        f"[{self.name}] Waiting for enough buffered features: "
+                        f"need={n_features}, have={flat.size}"
+                    )
+                    self._warned_feature_shape = True
+                return None
+
+            features = flat[-n_features:]
+            if not self._warned_feature_shape:
+                print(
+                    f"[{self.name}] Feature mapping via buffer window: "
+                    f"model={n_features}, sample_width={sample.shape[0]}, "
+                    f"buffer_values={flat.size}"
+                )
+                self._warned_feature_shape = True
+
+        features = self._assemble_features(np.asarray(features, dtype=float), label_to_value)
+        if features is None:
+            return None
+
+        return self._predict_from_features(features)
+
+    def _teardown(self):
+        if self._multi_source_mode:
+            for meta in self._inlets_meta:
+                try:
+                    meta["inlet"].close_stream()
+                except Exception:
+                    pass
+            self._inlets_meta = []
+            self._latest_by_source = {}
+            return
+        super()._teardown()
 
 class RegressionSensor(MLSensor):
-    # TODO: Implement a base class for regression models that output continuous values.
-    pass
+    """Specialized ML sensor for regression bundles."""
+
+    def _load_model(self):
+        super()._load_model()
+        if self._task != "regression":
+            raise ValueError(f"RegressionSensor requires task='regression', got '{self._task}'")
 
 class ClassificationSensor(MLSensor):
-    # TODO: Implement a base class for classification models that 
-    # output discrete labels or probabilities.
-    pass
+    """Specialized ML sensor for classification bundles."""
+
+    def _load_model(self):
+        super()._load_model()
+        if self._task != "classification":
+            raise ValueError(f"ClassificationSensor requires task='classification', got '{self._task}'")
