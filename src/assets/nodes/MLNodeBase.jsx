@@ -11,7 +11,7 @@ const STATUS_STYLES = {
 };
 
 /**
- * LabeledHandle — ReactFlow handle with an adjacent text label inside the node boundary.
+ * LabeledHandle - ReactFlow handle with an adjacent text label inside the node boundary.
  * Render these as direct children of MLNodeBase (via the `handles` prop) so they
  * sit outside the overflow:auto body div and are never clipped.
  *
@@ -40,7 +40,6 @@ export const LabeledHandle = ({ type, position, id, label, top = '50%' }) => {
         style={{
           position: 'absolute',
           top: `calc(${top} - 5px)`,
-          // Outside the node: right-align against left edge, or left-align against right edge
           ...(isLeft
             ? { right: '100%', paddingRight: 8, textAlign: 'right' }
             : { left: '100%',  paddingLeft: 8,  textAlign: 'left'  }),
@@ -60,10 +59,10 @@ export const LabeledHandle = ({ type, position, id, label, top = '50%' }) => {
 };
 
 /**
- * MLNodeBase — uniform dark container for all ML pipeline nodes.
+ * MLNodeBase - uniform dark container for all ML pipeline nodes.
  *
  * Props:
- *   handles   : ReactNode — LabeledHandle elements rendered as direct children
+ *   handles   : ReactNode - LabeledHandle elements rendered as direct children
  *               of the root div (outside the overflow body). Pass handles here
  *               to avoid clipping issues.
  */
@@ -82,7 +81,7 @@ const MLNodeBase = ({
 
   return (
     <div className="flex flex-col bg-echo-surface border border-echo-border w-full h-full relative">
-      {/* Handles live here — direct children of the relative root, not inside overflow:auto */}
+      {/* Handles live here - direct children of the relative root, not inside overflow:auto */}
       {handles}
 
       {/* Header / drag handle */}

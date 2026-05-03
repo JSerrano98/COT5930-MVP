@@ -17,12 +17,13 @@ let backendProc = null
 let sessionRunning = false
 let startupDone = false   // prevent re-running startup on HMR reloads
 
-// Send a startup status line to the renderer (if it's ready)
+// Startup Helpers
+// =========================
+
 function sendStartupStatus(msg) {
   win?.webContents?.send('startup:status', msg)
 }
 
-// Wait until GET /health returns 200
 async function waitForBackend(retries = 40, delayMs = 500) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -34,10 +35,8 @@ async function waitForBackend(retries = 40, delayMs = 500) {
   return false
 }
 
-// Full startup sequence: backend → session
 async function runStartup() {
   if (startupDone) {
-    // HMR reload — session is already running, just tell the renderer
     win?.webContents?.send('startup:ready', { sessionRunning })
     return
   }
@@ -67,7 +66,9 @@ async function runStartup() {
   win?.webContents?.send('startup:ready', { sessionRunning })
 }
 
-// ─── Backend process management ──────────────────────────────────────────────
+
+// Backend Process Management
+// =========================
 
 function startBackend() {
   if (backendProc) return
@@ -106,7 +107,9 @@ function stopBackend() {
   startupDone = false
 }
 
-// ─── Scripts ──────────────────────────────────────────────────────────────────
+
+// Script Management
+// =========================
 
 const SCRIPTS = {
   'Start All Sensors':       path.join(backendDir, 'sensors', 'start_all_sensors.py'),
@@ -140,7 +143,9 @@ function runScript(name) {
   return { ok: true }
 }
 
-// ─── Native menu ──────────────────────────────────────────────────────────────
+
+// Application Menu
+// =========================
 
 function buildMenu() {
   const scriptItems = Object.keys(SCRIPTS).map((name) => ({
@@ -168,10 +173,11 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-// ─── IPC handlers ─────────────────────────────────────────────────────────────
+
+// IPC Handlers
+// =========================
 
 ipcMain.handle('session:start', async () => {
-  // Called manually (e.g. after a stop). Startup sequence handles the initial start.
   try {
     const res = await fetch('http://127.0.0.1:8000/session/start', { method: 'POST' })
     const body = await res.json()
@@ -232,6 +238,55 @@ ipcMain.handle('models:defaultPath', () => {
   return p
 })
 
+ipcMain.handle('cleaned:defaultPath', () => {
+  const p = path.join(app.getPath('documents'), 'ECHO', 'Cleaned Datasets')
+  try { fs.mkdirSync(p, { recursive: true }) } catch { /* ignore */ }
+  return p
+})
+
+ipcMain.handle('workspaces:defaultPath', () => {
+  const p = path.join(app.getPath('documents'), 'ECHO', 'Dashboard Workspaces')
+  try { fs.mkdirSync(p, { recursive: true }) } catch { /* ignore */ }
+  return p
+})
+
+ipcMain.handle('workspace:save', async (_e, { directory, name, workspace }) => {
+  try {
+    const baseDir = (directory && String(directory).trim())
+      ? String(directory).trim()
+      : path.join(app.getPath('documents'), 'ECHO', 'Dashboard Workspaces')
+    fs.mkdirSync(baseDir, { recursive: true })
+
+    const safeName = (String(name || 'workspace').trim() || 'workspace')
+      .replace(/[<>:"/\\|?*]/g, '_')
+      .replace(/\s+/g, '_')
+    const fileName = safeName.toLowerCase().endsWith('.json') ? safeName : `${safeName}.json`
+    const filePath = path.join(baseDir, fileName)
+
+    const payload = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      ...workspace,
+    }
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8')
+    return { ok: true, path: filePath }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+ipcMain.handle('workspace:load', async (_e, filePath) => {
+  try {
+    const p = String(filePath || '').trim()
+    if (!p) return { ok: false, error: 'Missing workspace file path' }
+    const text = fs.readFileSync(p, 'utf-8')
+    const data = JSON.parse(text)
+    return { ok: true, path: p, workspace: data }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
 ipcMain.handle('recording:start', async (_e, { filePath, format }) => {
   try {
     const res = await fetch('http://127.0.0.1:8000/record/start', {
@@ -254,7 +309,9 @@ ipcMain.handle('recording:stop', async () => {
   }
 })
 
-// ─── Window ───────────────────────────────────────────────────────────────────
+
+// Window Boot
+// =========================
 
 const VITE_URL = 'http://localhost:5173'
 
@@ -343,6 +400,7 @@ const createWindow = () => {
     width: 1280,
     height: 800,
     backgroundColor: '#f5f5f4',
+    icon: path.join(__dirname, 'public', 'favicon.ico'),
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -350,14 +408,13 @@ const createWindow = () => {
     },
   })
 
-  // Show splash immediately while backend/session/sensors initialize.
   const splashHtml = buildNativeSplashHtml()
   win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`)
 }
 
 app.whenReady().then(() => {
   buildMenu()
-  startBackend()   // start backend immediately — no need to wait for window
+  startBackend()   // start backend immediately - no need to wait for window
   createWindow()
   runStartup().finally(() => loadRenderer())
 

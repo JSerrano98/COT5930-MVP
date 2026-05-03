@@ -28,8 +28,7 @@ class _XDFWriter:
     def __init__(self, streams: list[dict]):
         self._stream_ids: dict[str, int] = {}
         self._stream_infos: dict[str, dict] = {}
-        self._buffers: dict[str, list] = {}  # name -> [(ts, [values])]
-        # Pre-build fixed header bytes (magic + file header + stream headers)
+        self._buffers: dict[str, list] = {}  # name maps to [(ts, [values])]
         self._header = bytearray(self._MAGIC)
         self._header += self._make_chunk(
             1, b'<?xml version="1.0"?><info><version>1.0</version></info>'
@@ -112,7 +111,6 @@ class SessionManager:
         self._task: asyncio.Task | None = None
         self.update_rate = 120.  # Hz
 
-        # Recording state
         self._recording = False
         self._record_fmt: str = "csv"
         self._record_path: Path | None = None
@@ -121,13 +119,9 @@ class SessionManager:
         self._csv_file = None
         self._csv_writer = None
         self._xdf: _XDFWriter | None = None
-        # Wide-format column map: stream_name -> start column index (0-based, after timestamp)
         self._col_map: dict[str, int] = {}
         self._col_headers: list[str] = []
 
-    # ════════════════════════════════════════════════════════════════
-    # SESSION LIFECYCLE
-    # ════════════════════════════════════════════════════════════════
     def start(self):
         """Discover streams and begin the broadcast loop."""
         self.inlets = self._discover_streams()
@@ -155,9 +149,6 @@ class SessionManager:
         self.status = "Offline"
         log.info("Session stopped")
 
-    # ════════════════════════════════════════════════════════════════
-    # STREAM DISCOVERY
-    # ════════════════════════════════════════════════════════════════
     def _discover_streams(self, timeout: float = 3.0) -> list[dict]:
         """
         Find all LSL outlets on the network and create an inlet for each.
@@ -175,9 +166,6 @@ class SessionManager:
             inlet = StreamInlet(info, max_buflen=1)
             inlet.open_stream()
 
-            # inlet.info() fetches the full stream description from the publisher,
-            # including channel labels written by the sensor. The StreamInfo from
-            # resolve_streams() only carries basic metadata without the desc tree.
             try:
                 full_info = inlet.info(timeout=3.0)
             except Exception:
@@ -240,9 +228,6 @@ class SessionManager:
             for s in self.inlets
         ]
 
-    # ════════════════════════════════════════════════════════════════
-    # WEBSOCKET BROADCAST
-    # ════════════════════════════════════════════════════════════════
     async def add_client(self, ws):
         """
         Register a new WebSocket client.
@@ -286,9 +271,6 @@ class SessionManager:
 
             await asyncio.sleep(1.0 / self.update_rate)
 
-    # ════════════════════════════════════════════════════════════════
-    # RECORDING
-    # ════════════════════════════════════════════════════════════════
     def _default_recordings_dir(self) -> Path:
         """Returns (and creates) the default recordings folder next to this package."""
         p = Path(__file__).resolve().parent.parent / "recordings"
@@ -308,7 +290,6 @@ class SessionManager:
 
         if file_path:
             dest = Path(file_path)
-            # If caller gave a directory, auto-name the file inside it
             if dest.is_dir() or not dest.suffix:
                 dest = dest / f"recording_{ts}{ext}"
         else:
@@ -318,7 +299,6 @@ class SessionManager:
         self._record_path = dest
         self._record_fmt = fmt
 
-        # Build wide-format column layout from currently active streams
         self._col_map = {}
         self._col_headers = []
         col_idx = 0
@@ -384,7 +364,6 @@ class SessionManager:
             self._xdf.add_sample(stream_name, timestamp, sample)
             return
 
-        # Build wide row: timestamp + one slot per channel across all streams
         n_cols = len(self._col_headers)
         row = [""] * (n_cols + 1)
         row[0] = timestamp

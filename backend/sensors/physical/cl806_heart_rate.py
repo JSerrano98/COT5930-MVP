@@ -33,7 +33,6 @@ HEART_RATE_MEASUREMENT_CHAR_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
 class CL806HeartRate(PhysicalSensor):
     """Streams BPM from a CL806 BLE heart-rate monitor into LSL."""
 
-    # Use address for deterministic pairing when multiple BLE devices are nearby.
     ble_address: str | None = None
     ble_name: str = "CL806"
     scan_timeout: float = 8.0
@@ -54,8 +53,6 @@ class CL806HeartRate(PhysicalSensor):
             name="CL806_HR",
             type="HeartRate",
             channels=1,
-            # HR measurement notifications are event-driven (roughly beat-to-beat),
-            # not a fixed-rate waveform stream. In LSL, nominal_srate=0 means irregular timing.
             sample_rate=0,
             channel_labels=["bpm"],
             ble_address=os.getenv("CL806_BLE_ADDRESS") or None,
@@ -101,7 +98,6 @@ class CL806HeartRate(PhysicalSensor):
         devices = await BleakScanner.discover(timeout=self.scan_timeout)
         target = (self.ble_name or "").strip().lower()
 
-        # Try exact name first, then prefix, then substring.
         exact = None
         prefix = None
         contains = None

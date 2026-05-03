@@ -11,15 +11,12 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
   const nCh = stream?.channels ?? 0;
   const labels = stream?.channel_labels ?? [];
 
-  // Set of enabled channel indices — mutated directly so draw loop reads latest without re-renders
   const enabledRef = useRef(new Set(Array.from({ length: nCh }, (_, i) => i)));
 
-  // Re-initialise enabledRef when stream/nCh changes
   useEffect(() => {
     enabledRef.current = new Set(Array.from({ length: nCh }, (_, i) => i));
   }, [nCh]);
 
-  // Dropdown state
   const [open,    setOpen]    = useState(false);
   const [enabled, setEnabled] = useState(() => new Set(Array.from({ length: nCh }, (_, i) => i)));
 

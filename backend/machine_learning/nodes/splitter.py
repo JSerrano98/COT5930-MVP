@@ -20,7 +20,6 @@ def run(config: dict, upstream):
     shuffle   = config.get("shuffle",   True)
     seed      = int(config.get("seed",  42))
 
-    # Detect label column
     label_col = config.get('label', None)
   
    
@@ -38,7 +37,6 @@ def run(config: dict, upstream):
 
     stratify = y if strategy == "stratified" else None
 
-    # First split off test set
     X_trainval, X_test, y_trainval, y_test = train_test_split(
         X, y,
         test_size=test_size,
@@ -47,7 +45,6 @@ def run(config: dict, upstream):
         random_state=seed,
     )
 
-    # Then split validation from trainval
     if val_size > 0:
         adjusted_val = val_size / (1 - test_size)
         stratify_val = y_trainval if strategy == "stratified" else None
@@ -62,7 +59,6 @@ def run(config: dict, upstream):
         X_train, y_train = X_trainval, y_trainval
         X_val,   y_val   = pd.DataFrame(), pd.Series(dtype=y.dtype)
 
-    # Impute NaN values (fit on train only to avoid data leakage)
     imputer = SimpleImputer(strategy="mean")
     X_train = pd.DataFrame(imputer.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
     if len(X_val) > 0:
@@ -70,7 +66,6 @@ def run(config: dict, upstream):
     if len(X_test) > 0:
         X_test = pd.DataFrame(imputer.transform(X_test), columns=X_test.columns, index=X_test.index)
 
-    # Package splits into a dict — downstream nodes receive this as "upstream"
     splits = {
         "X_train": X_train, "y_train": y_train,
         "X_val":   X_val,   "y_val":   y_val,

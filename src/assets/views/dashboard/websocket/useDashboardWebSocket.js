@@ -73,7 +73,6 @@ export const useDashboardWebSocket = () => {
     if (wsRef.current) wsRef.current.close();
   }, []);
 
-  // Drain stale data buffer
   useEffect(() => {
     const interval = setInterval(() => {
       for (const key in dataRef.current) {

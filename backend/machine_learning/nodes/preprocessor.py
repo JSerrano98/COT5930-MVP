@@ -52,15 +52,12 @@ def run(config: dict, upstream):
     scaler = config.get("scaler",  "standard")
     filt   = config.get("filter",  "none")
     dropna = config.get("dropNa",  True)
-    # Drop NaN
     if dropna:
         df = df.dropna()
 
-    # Identify numeric (feature) columns — skip string/object columns
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     arr      = df[num_cols].values.astype(float)
 
-    # ── Scaling ──────────────────────────────────────────────────────
     if scaler == "standard":
         mean = arr.mean(axis=0)
         std  = arr.std(axis=0)
@@ -81,8 +78,6 @@ def run(config: dict, upstream):
         iqr[iqr == 0] = 1
         arr  = (arr - med) / iqr
 
-    # ── Filtering ─────────────────────────────────────────────────────
-    # Assume ~256 Hz if not provided; real pipelines should pass fs
     fs       = float(config.get("fs", 256))
     low_hz   = float(config.get("lowFreq",  1))
     high_hz  = float(config.get("highFreq", 50))

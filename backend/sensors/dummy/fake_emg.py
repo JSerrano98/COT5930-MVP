@@ -41,11 +41,9 @@ class FakeEMG(DummySensor):
             return
 
         if self._target_activation > 0.12:
-            # Return to rest.
             self._target_activation = float(self._rng.uniform(0.02, 0.08))
             self._state_time_left = float(self._rng.uniform(1.5, 4.5))
         else:
-            # New contraction burst.
             self._target_activation = float(self._rng.uniform(0.25, 0.95))
             self._state_time_left = float(self._rng.uniform(0.35, 1.6))
 
@@ -60,7 +58,6 @@ class FakeEMG(DummySensor):
         carrier = float(np.sum(np.sin(2 * np.pi * self._freqs * self._t + self._phases)))
         carrier /= len(self._freqs)
 
-        # Baseline instrumentation noise plus contraction-dependent motor-unit activity.
         baseline_noise = float(self._rng.normal(0.0, 2.0))
         active_noise = float(self._rng.normal(0.0, 12.0 * activation))
         signal = baseline_noise + (40.0 * activation * carrier) + active_noise

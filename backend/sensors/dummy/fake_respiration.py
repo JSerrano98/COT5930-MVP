@@ -35,7 +35,6 @@ class FakeRespiration(DummySensor):
         dt = 1.0 / self.sample_rate
         self._t += dt
 
-        # Respiratory rate and depth drift over time.
         self._rate_bpm += (14.0 - self._rate_bpm) * dt / 45.0
         self._rate_bpm += float(self._rng.normal(0.0, 0.03))
         self._rate_bpm = float(np.clip(self._rate_bpm, 8.0, 24.0))
@@ -47,7 +46,6 @@ class FakeRespiration(DummySensor):
         freq_hz = self._rate_bpm / 60.0
         self._phase += 2 * np.pi * freq_hz * dt
 
-        # Rounded inhalation / exhalation shape.
         fundamental = np.sin(self._phase)
         harmonic = 0.22 * np.sin(2 * self._phase - 0.4)
         belt = self._amp * (fundamental + harmonic)

@@ -13,7 +13,6 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure backend/ is importable when invoked as ./sensors/start_cl806.py
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))

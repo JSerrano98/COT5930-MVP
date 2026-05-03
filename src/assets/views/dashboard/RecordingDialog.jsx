@@ -1,7 +1,5 @@
 import { useState } from 'react';
 
-const API_URL = 'http://localhost:8000';
-
 const fmt = (d) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_` +
@@ -14,7 +12,6 @@ const getRecordingsDir = () =>
 const RecordingDialog = ({
   onConfirm,
   onCancel,
-  isElectron,
   title = 'NEW RECORDING',
   confirmLabel = 'Start Recording',
   startRecordingOnConfirm = true,
@@ -34,15 +31,7 @@ const RecordingDialog = ({
     const filePath = `${folder}/${name}${ext}`;
 
     if (startRecordingOnConfirm) {
-      if (isElectron && window.echo?.startRecording) {
-        await window.echo.startRecording({ filePath, format });
-      } else {
-        await fetch(`${API_URL}/record/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_path: filePath, format }),
-        }).catch(() => {});
-      }
+      await window.echo.startRecording({ filePath, format });
     }
 
     setLoading(false);

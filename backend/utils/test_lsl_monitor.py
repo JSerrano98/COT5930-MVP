@@ -80,7 +80,6 @@ def main() -> int:
                 saw_data = True
                 print(f"[{timestamp:.3f}] {s['name']:<16} {_format_sample(sample)}")
 
-            # Small sleep prevents a tight CPU loop while still feeling real-time.
             if not saw_data:
                 time.sleep(0.01)
     except KeyboardInterrupt:

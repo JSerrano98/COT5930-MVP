@@ -10,7 +10,6 @@ import Dashboard from './assets/views/dashboard/Dashboard';
 import Settings from './assets/views/settings/Settings';
 import MachineLearning from './assets/views/ml/MachineLearning';
 
-// Inner component so useLocation works inside HashRouter
 const AppLayout = () => {
   const { pathname } = useLocation();
   const isDashboard = pathname === '/';
@@ -19,7 +18,7 @@ const AppLayout = () => {
   return (
     <div className="flex h-screen bg-echo-base">
       <div className="flex-1 overflow-y-auto relative">
-        {/* Dashboard is always mounted — visibility toggled so WS/state persists */}
+        {/* Dashboard is always mounted - visibility toggled so WS/state persists */}
         <div style={{ display: isDashboard ? 'flex' : 'none', width: '100%', height: '100%' }}>
           <Dashboard />
         </div>
@@ -44,8 +43,7 @@ const AppLayout = () => {
 };
 
 const App = () => {
-  const isElectron = Boolean(window.echo?.getStartupStatus);
-  const [appReady, setAppReady] = useState(isElectron);
+  const [appReady, setAppReady] = useState(false);
   const handleReady = useCallback(() => setAppReady(true), []);
 
   return (

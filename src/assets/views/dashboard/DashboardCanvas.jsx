@@ -12,7 +12,6 @@ import EMGNode from './monitor/EMGNode';
 import RespirationNode from './monitor/RespirationNode';
 import TemperatureNode from './monitor/TemperatureNode';
 
-// Each node wraps its content in Monitor to get the header + container
 const WaveformFlowNode = ({ data }) => (
   <Monitor stream={data.stream} nodeType="waveform" lineColor={data.lineColor} onColorChange={data.onColorChange} onRemove={data.onRemove} dataRef={data.dataRef}>
     <WaveformNode stream={data.stream} dataRef={data.dataRef} lineColor={data.lineColor} />
@@ -124,14 +123,12 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
   const [nodes, setNodes, onNodesChange] = useNodesState(monitors.map((m, i) => makeNode(m, i)));
   const [edges, setEdges, onEdgesState] = useEdgesState([]);
 
-  // Sync monitors → nodes, preserving positions/sizes of existing nodes
   useEffect(() => {
     setNodes(prev => {
       const posMap = Object.fromEntries(prev.map(n => [n.id, n.position]));
       const sizeMap = Object.fromEntries(prev.map(n => [n.id, n.style]));
       return monitors.map((mon, idx) => makeNode(mon, idx, posMap, sizeMap));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monitors]);
 
   const onConnect = useCallback((params) => setEdges(eds => addEdge(params, eds)), [setEdges]);

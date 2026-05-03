@@ -25,7 +25,6 @@ from .model_workbench import (
 logger    = logging.getLogger(__name__)
 router    = APIRouter(prefix="/ml", tags=["ML"])
 
-# Directories for persisted pipelines and trained models
 _BASE       = os.path.dirname(os.path.dirname(__file__))
 PIPELINES_DIR = os.path.join(_BASE, "ml_pipelines")
 MODELS_DIR    = os.path.join(_BASE, "ml_models")
@@ -36,7 +35,6 @@ def _ensure_dirs():
     os.makedirs(MODELS_DIR,    exist_ok=True)
 
 
-# ── Pydantic schemas ──────────────────────────────────────────────────────────
 
 class EdgeSchema(BaseModel):
     id:           str
@@ -90,7 +88,6 @@ class CleanDatasetSchema(BaseModel):
     column_ops: list[ColumnOpSchema] = Field(default_factory=list)
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/pipeline/run")
 async def run_pipeline(pipeline: PipelineSchema):

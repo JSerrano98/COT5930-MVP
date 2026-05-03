@@ -56,7 +56,6 @@ def _train_neural_mlp(spec: dict, splits: dict, config: dict):
     task   = splits.get("task", "classification")
     params = spec.get("params", {})
 
-    # Parse hidden layer sizes
     raw_layers = str(params.get("hidden_layers", "128,64"))
     hidden     = tuple(int(x.strip()) for x in raw_layers.split(",") if x.strip().isdigit())
     dropout_alpha = float(params.get("dropout", 0.3))  # sklearn uses alpha for L2 reg
@@ -105,7 +104,6 @@ def run(config: dict, upstream):
     else:
         trained_model, metrics = _train_sklearn(model_obj, splits, config)
 
-    # Save model
     _ensure_models_dir()
     save_path = os.path.join(MODELS_DIR, f"{model_name}.pkl")
     with open(save_path, "wb") as f:
@@ -113,7 +111,6 @@ def run(config: dict, upstream):
 
     logger.info("Model saved to %s", save_path)
 
-    # Pass trained model downstream for evaluation
     splits["trained_model"] = trained_model
     splits["model_path"]    = save_path
 

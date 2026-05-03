@@ -122,7 +122,6 @@ const CSVReplayNode = ({ monitor, dataRef, onPatch, onRecordingChange }) => {
   }, [monitor.replayUid, monitor.running, onPatch, onRecordingChange, pushAlert]);
 
   const pickCsv = async () => {
-    if (!window.echo?.pickFile) return;
     const picked = await window.echo.pickFile({
       defaultPath: monitor.csvPath || (await window.echo.getDefaultRecordingPath?.()) || undefined,
       filters: [
@@ -227,14 +226,12 @@ const CSVReplayNode = ({ monitor, dataRef, onPatch, onRecordingChange }) => {
                   placeholder="path/to/replay.csv"
                   className="min-w-0 flex-1 border border-echo-border bg-echo-surface-2 px-2 py-1 text-xs text-white outline-none focus:border-echo-green"
                 />
-                {!!window.echo?.pickFile && (
-                  <button
-                    onClick={pickCsv}
-                    className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-muted hover:border-echo-green hover:text-white"
-                  >
-                    BROWSE
-                  </button>
-                )}
+                <button
+                  onClick={pickCsv}
+                  className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-muted hover:border-echo-green hover:text-white"
+                >
+                  BROWSE
+                </button>
               </div>
             </label>
 
@@ -288,7 +285,6 @@ const CSVReplayNode = ({ monitor, dataRef, onPatch, onRecordingChange }) => {
 
       {showRecordDialog && (
         <RecordingDialog
-          isElectron={Boolean(window.echo)}
           onCancel={() => setShowRecordDialog(false)}
           onConfirm={startReplay}
           startRecordingOnConfirm={false}

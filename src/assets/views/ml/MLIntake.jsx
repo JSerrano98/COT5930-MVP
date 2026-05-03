@@ -2,14 +2,11 @@ const getModelsDir = () =>
   localStorage.getItem('echo_models_dir') || 'backend/ml_models';
 
 /**
- * MLIntake — Step 1 of the ML workflow.
+ * MLIntake - Step 1 of the ML workflow.
  * User picks: dataset and task type. Save directory comes from Settings.
  */
 const MLIntake = ({ intake, onChange, onContinue }) => {
-  const isElectron = Boolean(window.echo?.pickFile);
-
   const browseDataset = async () => {
-    if (!window.echo?.pickFile) return;
     const picked = await window.echo.pickFile({
       defaultPath: intake.datasetPath || undefined,
       filters: [{ name: 'CSV Datasets', extensions: ['csv'] }, { name: 'All Files', extensions: ['*'] }],
@@ -42,20 +39,13 @@ const MLIntake = ({ intake, onChange, onContinue }) => {
               placeholder="path/to/dataset.csv"
               className="flex-1 bg-echo-surface-2 border border-echo-border text-white px-3 py-2 text-sm focus:border-echo-green font-body"
             />
-            {isElectron && (
-              <button
-                onClick={browseDataset}
-                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
-              >
-                Browse
-              </button>
-            )}
+            <button
+              onClick={browseDataset}
+              className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
+            >
+              Browse
+            </button>
           </div>
-          {!isElectron && (
-            <span className="text-[10px] text-echo-dim font-body">
-              Enter a path relative to the backend root (e.g. data/CSV/file.csv).
-            </span>
-          )}
         </div>
 
         {/* Model name */}

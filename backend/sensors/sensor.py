@@ -23,9 +23,6 @@ from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-# ════════════════════════════════════════════════════════════════════
-# BASE SENSOR - ABSTRACT CLASS THAT WRAPS ANY SENSOR INTO AN LSL OUTLET
-# ════════════════════════════════════════════════════════════════════
 
 @dataclass
 class Sensor(ABC):
@@ -62,7 +59,6 @@ class Sensor(ABC):
         if self.channels < 1:
             raise ValueError("There must be at least 1 channel for a signal")
 
-        # LSL nominal_srate=0 means irregular/event-driven stream timing.
         if self.sample_rate < 0:
             raise ValueError("Sample Rate must be >= 0 (use 0 for irregular streams)")
 
@@ -87,7 +83,6 @@ class Sensor(ABC):
             self.uid,             # source_id
         )
 
-        # Add channel labels to the stream info description
         chns = info.desc().append_child("channels")
         for label in self.channel_labels:
             chns.append_child("channel").append_child_value("label", label)
@@ -161,9 +156,6 @@ class Sensor(ABC):
         if self._outlet:
             self._outlet.push_sample(sample)
 
-# ════════════════════════════════════════════════════════════════════
-# PHYSICAL SENSOR - FOR UNSUPPORTED DEVICES THAT REQUIRE A DRIVER/SDK/API CONNECTION
-# ════════════════════════════════════════════════════════════════════
 
 @dataclass
 class PhysicalSensor(Sensor):
@@ -193,7 +185,6 @@ class PhysicalSensor(Sensor):
         """
         pass
 
-    # Base class hooks
     def _setup(self):
         print(f"[{self.name}] Connecting to device...")
         self.connect()
@@ -209,9 +200,6 @@ class PhysicalSensor(Sensor):
         self.disconnect()
 
 
-# ════════════════════════════════════════════════════════════════════
-# DERIVED SENSOR - FOR COMPUTED METRICS THAT DERIVE FROM RAW SENSORS
-# ════════════════════════════════════════════════════════════════════
 
 @dataclass
 class DerivedSensor(Sensor):
@@ -269,7 +257,6 @@ class DerivedSensor(Sensor):
         """
         ...
 
-    # Base class hooks
     def _extract_channel_labels(self, info) -> list[str]:
         labels = []
         ch = info.desc().child("channels").child("channel")
@@ -304,8 +291,6 @@ class DerivedSensor(Sensor):
         if self.source_rate > 0:
             buf_len = int(self.source_rate * self.buffer_seconds)
         else:
-            # Irregular streams report nominal_srate=0; keep a bounded rolling
-            # window based on process cadence so derived sensors still function.
             buf_len = int(self.buffer_seconds / self.process_interval)
         buf_len = max(1, buf_len)
         self._buffer = np.zeros((buf_len, source_channels))
@@ -322,7 +307,6 @@ class DerivedSensor(Sensor):
         if not samples:
             return
 
-        # Fill the rolling buffer with incoming samples
         for sample in samples:
             self._buffer[self._buf_idx] = sample
             self._buf_idx += 1
@@ -330,7 +314,6 @@ class DerivedSensor(Sensor):
                 self._buf_idx = 0
                 self._buf_full = True
 
-        # Build the buffer view: oldest first
         if self._buf_full:
             buf = np.roll(self._buffer, -self._buf_idx, axis=0)
         else:
@@ -348,9 +331,6 @@ class DerivedSensor(Sensor):
             self._inlet.close_stream()
 
 
-# ════════════════════════════════════════════════════════════════════
-# DUMMY SENSOR - FOR TESTING AND PLACEHOLDING
-# ════════════════════════════════════════════════════════════════════
 @dataclass
 class DummySensor(Sensor):
     """
@@ -373,7 +353,6 @@ class DummySensor(Sensor):
         """
         ...
 
-    # Base class hooks
 
     def _setup(self):
         print(f"[{self.name}] Starting dummy sensor...")
@@ -385,9 +364,6 @@ class DummySensor(Sensor):
             time.sleep(1.0 / self.sample_rate)
 
 
-# ════════════════════════════════════════════════════════════════════
-# MACHINE LEARNING SENSOR - DERIVED SENSOR THAT APPLIES A PRE-TRAINED MODEL TO THE BUFFER
-# ════════════════════════════════════════════════════════════════════
 @dataclass
 class MLSensor(DerivedSensor):
     """
@@ -429,7 +405,6 @@ class MLSensor(DerivedSensor):
         }
         object.__setattr__(self, 'feature_aliases', aliases)
 
-        # Placeholder until model is loaded and output channels are inferred.
         if self.channels < 1:
             object.__setattr__(self, 'channels', 1)
 
@@ -465,7 +440,6 @@ class MLSensor(DerivedSensor):
     def _setup(self):
         self._load_model()
 
-        # One output for prediction, optional second for confidence.
         n_channels = 2 if self._has_proba else 1
         object.__setattr__(self, 'channels', n_channels)
         labels = ["prediction"] + (["confidence"] if self._has_proba else [])
@@ -531,7 +505,6 @@ class MLSensor(DerivedSensor):
     def _predict_from_features(self, features: np.ndarray) -> list[float] | None:
         vec = np.asarray(features, dtype=float).reshape(-1)
 
-        # Preserve feature names for models/pipelines trained with named columns.
         if self._feature_cols and len(self._feature_cols) == vec.size:
             X = pd.DataFrame([vec], columns=self._feature_cols)
         else:
@@ -641,12 +614,9 @@ class MLSensor(DerivedSensor):
         for idx, label in enumerate(self._source_channel_labels[:sample.shape[0]]):
             label_to_value[f"{self.source_name}::{label}"] = float(sample[idx])
 
-        # Prefer latest-sample features when dimensions already match.
         if sample.shape[0] >= n_features:
             features = sample[:n_features]
         else:
-            # If the model expects more features than a single source sample has,
-            # build a feature vector from the rolling buffer (oldest -> newest).
             flat = buffer.reshape(-1)
             if flat.size < n_features:
                 if not self._warned_feature_shape:

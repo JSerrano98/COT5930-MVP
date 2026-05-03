@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 const HISTORY_S = 30;  // seconds of BPM history to keep
 
-// BPM zone thresholds (standard adult resting/active ranges)
 const ZONES = [
   { max: 60,  label: 'Low',      color: '#60a5fa' },  // blue
   { max: 100, label: 'Normal',   color: '#22c55e' },  // green
@@ -46,7 +45,6 @@ const BPMNode = ({ stream, dataRef }) => {
     return () => clearInterval(timerRef.current);
   }, [stream, dataRef]);
 
-  // Derived stats from history
   const bpms = history.map(h => h.bpm);
   const min  = bpms.length ? Math.round(Math.min(...bpms)) : null;
   const max  = bpms.length ? Math.round(Math.max(...bpms)) : null;

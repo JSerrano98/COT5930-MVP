@@ -1,8 +1,28 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import MLIntake from './MLIntake';
 import MLClean from './MLClean';
 
 const BACKEND = 'http://localhost:8000';
+
+const ML_STATE_KEY = 'echo_ml_state';
+const WORKBENCH_MODELS_KEY = 'echo_ml_workbench_models';
+const WORKBENCH_STATE_KEY = 'echo_ml_workbench_state';
+
+const readJSON = (key, fallback = {}) => {
+  try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
+};
+
+const readMLState = () => {
+  return readJSON(ML_STATE_KEY, {});
+};
+
+const readWorkbenchModels = () => readJSON(WORKBENCH_MODELS_KEY, {});
+
+const readWorkbenchState = (datasetPath, taskType) => {
+  const state = readJSON(WORKBENCH_STATE_KEY, {});
+  if (state.datasetPath === datasetPath && state.taskType === taskType) return state;
+  return null;
+};
 
 const DEFAULT_SPLIT = {
   test_size: 0.2,
@@ -38,44 +58,101 @@ const getModelFilePreview = (modelName, modelKey) => {
   return `${rawName}.pkl`;
 };
 
-// Configure + Train step
 const MLTrainForm = ({ intake, onBack }) => {
-  const [models, setModels]           = useState({});
-  const [modelKey, setModelKey]       = useState('');
-  const [params, setParams]           = useState({});
-  const [labelCol, setLabelCol]       = useState('');
-  const [split, setSplit]             = useState(DEFAULT_SPLIT);
-  const [columns, setColumns]         = useState([]);
-  const [datasetRows, setDatasetRows] = useState(null);
-  const [result, setResult]           = useState(null);
+  const cachedState = useMemo(
+    () => readWorkbenchState(intake.datasetPath, intake.taskType),
+    [intake.datasetPath, intake.taskType]
+  );
+
+  const [models, setModels]           = useState(() => readWorkbenchModels());
+  const [modelKey, setModelKey]       = useState(() => cachedState?.modelKey ?? '');
+  const [params, setParams]           = useState(() => cachedState?.params ?? {});
+  const [labelCol, setLabelCol]       = useState(() => cachedState?.labelCol ?? '');
+  const [split, setSplit]             = useState(() => cachedState?.split ?? DEFAULT_SPLIT);
+  const [columns, setColumns]         = useState(() => cachedState?.columns ?? []);
+  const [datasetRows, setDatasetRows] = useState(() => cachedState?.datasetRows ?? null);
+  const [result, setResult]           = useState(() => cachedState?.result ?? null);
   const [error, setError]             = useState('');
-  const [loading, setLoading]         = useState(false);
-  const [columnsLoaded, setColumnsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [columnsLoading, setColumnsLoading] = useState(false);
+  const [training, setTraining]       = useState(false);
+  const [columnsLoaded, setColumnsLoaded] = useState(() => Boolean(cachedState?.columnsLoaded));
 
   const filteredModels = useMemo(
     () => Object.fromEntries(Object.entries(models).filter(([, spec]) => spec.task === intake.taskType)),
     [models, intake.taskType]
   );
 
-  useEffect(() => {
+  const fetchModels = () => {
+    setModelsLoading(true);
+    setError('');
     fetch(`${BACKEND}/ml/workbench/models`)
       .then((r) => r.json())
       .then((data) => {
         const all = data.models ?? {};
         setModels(all);
-        const firstKey = Object.keys(all).find((k) => all[k].task === intake.taskType);
-        if (firstKey) {
-          setModelKey(firstKey);
-          setParams(buildDefaultParams(all[firstKey]?.params));
+        const hasCurrent = modelKey && all[modelKey]?.task === intake.taskType;
+        if (!hasCurrent) {
+          const firstKey = Object.keys(all).find((k) => all[k].task === intake.taskType);
+          if (firstKey) {
+            setModelKey(firstKey);
+            setParams(buildDefaultParams(all[firstKey]?.params));
+          }
         }
       })
-      .catch((err) => setError(String(err.message ?? err)));
+      .catch((err) => setError(String(err.message ?? err)))
+      .finally(() => setModelsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchModels();
   }, [intake.taskType]);
+
+  useEffect(() => {
+    if (!Object.keys(filteredModels).length) return;
+    if (!modelKey || !filteredModels[modelKey]) {
+      const first = Object.keys(filteredModels)[0];
+      setModelKey(first);
+      setParams(buildDefaultParams(models[first]?.params));
+    }
+  }, [filteredModels, modelKey, models]);
+
+  useEffect(() => {
+    if (!Object.keys(models).length) return;
+    try { localStorage.setItem(WORKBENCH_MODELS_KEY, JSON.stringify(models)); } catch { /* quota */ }
+  }, [models]);
+
+  useEffect(() => {
+    if (!intake.datasetPath || !intake.taskType) return;
+    const snapshot = {
+      datasetPath: intake.datasetPath,
+      taskType: intake.taskType,
+      modelKey,
+      params,
+      labelCol,
+      split,
+      columns,
+      datasetRows,
+      result,
+      columnsLoaded,
+    };
+    try { localStorage.setItem(WORKBENCH_STATE_KEY, JSON.stringify(snapshot)); } catch { /* quota */ }
+  }, [
+    intake.datasetPath,
+    intake.taskType,
+    modelKey,
+    params,
+    labelCol,
+    split,
+    columns,
+    datasetRows,
+    result,
+    columnsLoaded,
+  ]);
 
   useEffect(() => {
     if (!intake.datasetPath || columnsLoaded) return;
     loadColumns();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intake.datasetPath]);
 
   const modelSpec = useMemo(() => models[modelKey] ?? null, [models, modelKey]);
@@ -88,7 +165,7 @@ const MLTrainForm = ({ intake, onBack }) => {
   };
 
   const loadColumns = async () => {
-    setLoading(true);
+    setColumnsLoading(true);
     setError('');
     try {
       const res  = await fetch(`${BACKEND}/ml/workbench/columns`, {
@@ -101,16 +178,29 @@ const MLTrainForm = ({ intake, onBack }) => {
       setColumns(data.columns ?? []);
       setDatasetRows(data.rows ?? null);
       setColumnsLoaded(true);
-      if (data.columns?.length) setLabelCol(data.columns[0]);
+      if (data.columns?.length) {
+        setLabelCol((prev) => (prev && data.columns.includes(prev) ? prev : data.columns[0]));
+      }
+      return data;
     } catch (err) {
       setError(String(err.message ?? err));
+      return null;
     } finally {
-      setLoading(false);
+      setColumnsLoading(false);
     }
   };
 
   const train = async () => {
-    setLoading(true);
+    if (!modelKey) {
+      setError('Select a model before training.');
+      return;
+    }
+    if (!labelCol) {
+      setError('Select a target label before training.');
+      return;
+    }
+
+    setTraining(true);
     setError('');
     setResult(null);
     try {
@@ -134,7 +224,7 @@ const MLTrainForm = ({ intake, onBack }) => {
     } catch (err) {
       setError(String(err.message ?? err));
     } finally {
-      setLoading(false);
+      setTraining(false);
     }
   };
 
@@ -162,29 +252,42 @@ const MLTrainForm = ({ intake, onBack }) => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1">
               <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Model</span>
-              <select
-                value={modelKey}
-                onChange={(e) => onModelChange(e.target.value)}
-                className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
-              >
-                {Object.entries(filteredModels).map(([key, spec]) => (
-                  <option key={key} value={key}>{spec.label}</option>
-                ))}
-              </select>
+              {Object.keys(filteredModels).length === 0 ? (
+                <div className="flex items-center gap-2 border border-echo-border bg-echo-surface-2 px-3 py-2">
+                  <span className="text-xs text-echo-dim font-body flex-1">{modelsLoading ? 'Loading models…' : 'No models available'}</span>
+                  <button
+                    onClick={fetchModels}
+                    disabled={modelsLoading}
+                    className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-green hover:text-white transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={modelKey}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-echo-green font-body"
+                >
+                  {Object.entries(filteredModels).map(([key, spec]) => (
+                    <option key={key} value={key}>{spec.label}</option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body">
               <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[\/\\]/).pop()}</span></p>
               <p className="mt-1">Rows: <span className="font-ui font-semibold text-white">{datasetRows ?? '—'}</span></p>
               {!columnsLoaded && (
-                <button onClick={loadColumns} disabled={loading} className="mt-2 text-[10px] text-echo-green underline disabled:opacity-50 font-ui">
+                <button onClick={loadColumns} disabled={columnsLoading} className="mt-2 text-[10px] text-echo-green underline disabled:opacity-50 font-ui">
                   Load columns
                 </button>
               )}
             </div>
 
             <label className="flex flex-col gap-1 md:col-span-2">
-              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Label Column</span>
+              <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Target Label</span>
               {columns.length > 0 ? (
                 <select
                   value={labelCol}
@@ -266,9 +369,9 @@ const MLTrainForm = ({ intake, onBack }) => {
           </div>
 
           <div className="mt-6 flex gap-2">
-            <button onClick={train} disabled={loading || !labelCol}
+            <button onClick={train} disabled={training || modelsLoading || columnsLoading || !labelCol || !modelKey}
               className="border border-echo-green text-echo-green bg-echo-green/10 px-4 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase hover:bg-echo-green/20 transition-colors disabled:opacity-50">
-              {loading ? 'Training…' : 'Train & Save Model'}
+              {training ? 'Training…' : 'Train & Save Model'}
             </button>
             <button onClick={() => { setResult(null); setError(''); }}
               className="border border-echo-border text-echo-muted px-4 py-2 text-[10px] font-ui font-semibold tracking-widest uppercase hover:border-echo-muted hover:text-white transition-colors">
@@ -309,14 +412,21 @@ const MLTrainForm = ({ intake, onBack }) => {
 
 };
 
-// Root orchestrator
 const DEFAULT_INTAKE = { datasetPath: '', taskType: '', modelName: '' };
 
 const MachineLearning = () => {
-  const [step, setStep]     = useState('intake');   // 'intake' | 'clean' | 'configure'
-  const [intake, setIntake] = useState(DEFAULT_INTAKE);
+  const [intake, setIntake] = useState(() => readMLState().intake  ?? DEFAULT_INTAKE);
+  const [step, setStep]     = useState(() => {
+    const saved = readMLState();
+    const ok = saved.intake?.datasetPath?.trim() && saved.intake?.taskType?.trim();
+    return ok ? (saved.step ?? 'intake') : 'intake';
+  });
 
   const handleIntakeChange = (patch) => setIntake((prev) => ({ ...prev, ...patch }));
+
+  useEffect(() => {
+    try { localStorage.setItem(ML_STATE_KEY, JSON.stringify({ step, intake })); } catch { /* quota */ }
+  }, [step, intake]);
 
   return (
     <div className="flex h-full w-full flex-col">

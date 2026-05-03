@@ -29,7 +29,6 @@ const StatsNode = ({ stream, dataRef }) => {
   const rate = stream?.rate ?? 1;
   const nCh  = Math.min(stream?.channels ?? 1, MAX_CH);
 
-  // Time window controls — default 1 second
   const [windowVal,  setWindowVal]  = useState(1);
   const [windowUnit, setWindowUnit] = useState('s');  // 'ms' | 's' | 'min' | 'samples'
 
@@ -57,7 +56,6 @@ const StatsNode = ({ stream, dataRef }) => {
     update();
     timerRef.current = setInterval(update, 250);
     return () => clearInterval(timerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream, dataRef, nCh, windowVal, windowUnit, rate]);
 
   return (

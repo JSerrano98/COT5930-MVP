@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
-/* ─── ECHO Design Tokens ────────────────────────────────────────── */
+/* ECHO Design Tokens */
+/* ========================= */
 @theme {
-  --color-echo-bg:        #E8ECF0;   /* light grey – canvas / workspace */
-  --color-echo-surface:   #243040;   /* gunmetal + blue – panels         */
-  --color-echo-surface-2: #1A2535;   /* deeper gunmetal – nested panels  */
+  --color-echo-bg:        #E8ECF0;   /* light grey - canvas / workspace */
+  --color-echo-surface:   #243040;   /* gunmetal + blue - panels         */
+  --color-echo-surface-2: #1A2535;   /* deeper gunmetal - nested panels  */
   --color-echo-base:      #111820;   /* near-black base                  */
   --color-echo-border:    #2E4057;   /* panel border                     */
   --color-echo-border-2:  #1B2D40;   /* subtle divider                   */
-  --color-echo-green:     #FF7A00;   /* neon orange – primary accent     */
+  --color-echo-green:     #FF7A00;   /* neon orange - primary accent     */
   --color-echo-blue:      #00D4FF;   /* neon blue accent                 */
   --color-echo-orange:    #FF7A00;   /* neon orange accent (alias)       */
   --color-echo-text:      #FFFFFF;   /* primary text                     */
@@ -16,7 +17,8 @@
   --color-echo-dim:       #4A5D70;   /* tertiary / placeholder text      */
 }
 
-/* ─── Global reset – SHARP CORNERS ─────────────────────────────── */
+/* Global reset - SHARP CORNERS */
+/* ========================= */
 *, *::before, *::after {
   border-radius: 0 !important;
   box-sizing: border-box;
@@ -24,7 +26,8 @@
 /* Escape hatch for true circles (status dots, spinners) */
 .echo-circle { border-radius: 50% !important; }
 
-/* ─── Typography ────────────────────────────────────────────────── */
+/* Typography */
+/* ========================= */
 body {
   font-family: 'Roboto', Arial, sans-serif;
   color: #FFFFFF;
@@ -48,13 +51,15 @@ input, select, textarea,
   font-family: 'Roboto', Arial, sans-serif;
 }
 
-/* ─── Scrollbars ────────────────────────────────────────────────── */
+/* Scrollbars */
+/* ========================= */
 ::-webkit-scrollbar          { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track    { background: transparent; }
 ::-webkit-scrollbar-thumb    { background: #2E4057; }
 ::-webkit-scrollbar-thumb:hover { background: #FF7A00; }
 
-/* ─── ReactFlow global overrides ───────────────────────────────── */
+/* ReactFlow global overrides */
+/* ========================= */
 .react-flow__controls button {
   background: #1A2535 !important;
   border: 1px solid #2E4057 !important;
@@ -78,7 +83,8 @@ input, select, textarea,
 }
 .react-flow__attribution { display: none !important; }
 
-/* ─── Form element reset ────────────────────────────────────────── */
+/* Form element reset */
+/* ========================= */
 input, select, textarea {
   background-color: #1A2535;
   color: #FFFFFF;
@@ -97,12 +103,14 @@ select option {
   color: #FFFFFF;
 }
 
-/* ─── Table styling ─────────────────────────────────────────────── */
+/* Table styling */
+/* ========================= */
 table { border-collapse: collapse; width: 100%; }
 th    { font-family: 'Lexend', sans-serif; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: #7A8FA6; background: #1A2535; }
 td    { font-family: 'Roboto', Arial, sans-serif; font-size: 0.75rem; color: #FFFFFF; }
 
-/* ─── Utility helpers ───────────────────────────────────────────── */
+/* Utility helpers */
+/* ========================= */
 .echo-btn {
   font-family: 'Lexend', sans-serif;
   font-size: 0.7rem;
@@ -153,9 +161,9 @@ td    { font-family: 'Roboto', Arial, sans-serif; font-size: 0.75rem; color: #FF
   padding: 0.125rem 0.5rem;
 }
 
-/* ─── Keyframe animations ───────────────────────────────────────── */
+/* Keyframe animations */
+/* ========================= */
 @keyframes echo-pulse     { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 @keyframes echo-spin      { to { transform: rotate(360deg); } }
 @keyframes echo-fade-in   { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @keyframes echo-slide-in  { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:translateX(0); } }
-

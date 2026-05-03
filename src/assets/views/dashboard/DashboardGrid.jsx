@@ -6,8 +6,6 @@ import Monitor from './monitor/Monitor';
 import WaveformNode from './monitor/WaveformNode';
 import StatsNode from './monitor/StatsNode';
 
-// Standard RGL config — rowHeight=20, cols=12, default card 4×9
-// Pixel height = h*rowHeight + (h-1)*marginY = 9*20 + 8*4 = 212px
 const ROW_H  = 20;
 const COLS   = 12;
 const CARD_W = 4;
@@ -48,8 +46,6 @@ const DashboardGrid = ({ monitors = [], dataRef, onRemove, onUpdateMonitor, sess
     return () => ro.disconnect();
   }, []);
 
-  // Only store user-initiated drag/resize overrides — NOT auto-computed positions.
-  // This prevents RGL's internal compaction from corrupting default sizes.
   const [overrides, setOverrides] = useState({});
 
   const layout = useMemo(() =>

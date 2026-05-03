@@ -26,7 +26,6 @@ def run(config: dict, upstream=None):
     if not path:
         raise ValueError("DataLoader: 'path' is required.")
 
-    # Resolve relative paths against the backend directory
     if not os.path.isabs(path):
         base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         path = os.path.join(base, path)

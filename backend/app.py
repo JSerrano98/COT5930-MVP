@@ -4,10 +4,7 @@
 
 
 
-#ECHO Backend — FastAPI Application
 
-#Main entry point for the backend server.
-#Uses SessionManager for all LSL/WebSocket logic.
 
 import sys
 
@@ -48,9 +45,6 @@ app.add_middleware(
 
 app.include_router(ml_router)
 
-# ════════════════════════════════════════════════════════════════════
-# INFO
-# ════════════════════════════════════════════════════════════════════
 @app.get("/")
 async def root():
     return {
@@ -64,9 +58,6 @@ async def root():
 async def health():
     return {"status": "ok", "session": session.status}
 
-# ════════════════════════════════════════════════════════════════════
-# SESSION
-# ════════════════════════════════════════════════════════════════════
 @app.post("/session/start")
 async def start_session():
     if session.status == "Online":
@@ -79,9 +70,6 @@ async def stop_session():
     await session.stop()
     return {"ok": True, "status": session.status}
 
-# ════════════════════════════════════════════════════════════════════
-# STREAMS
-# ════════════════════════════════════════════════════════════════════
 @app.get("/streams")
 def list_streams():
     return session.list_streams()
@@ -90,9 +78,6 @@ def list_streams():
 def refresh_streams():
     return session.refresh()
 
-# ════════════════════════════════════════════════════════════════════
-# RECORDING
-# ════════════════════════════════════════════════════════════════════
 from pydantic import BaseModel
 
 class RecordStartRequest(BaseModel):
@@ -110,9 +95,6 @@ def stop_recording():
     saved_path = session.stop_recording()
     return {"recording": False, "saved_to": saved_path}
 
-# ════════════════════════════════════════════════════════════════════
-# WEBSOCKET
-# ════════════════════════════════════════════════════════════════════
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -133,7 +115,6 @@ def replay():
 
 @app.get('/CSV/')
 def list_files():
-    # Get all file names in the directory
     print('help')
     try:
         files = os.listdir(STORAGE_PATH)
@@ -144,7 +125,6 @@ def list_files():
 
 @app.get('/ML/')
 async def read_user_item(file: str):
-##seperate pd.read function from app.py later
     print(file)
     try:
         
@@ -161,9 +141,6 @@ async def read_user_item(file: str):
         return {"error": "Invalid file type"}, 400
 
 
-# ════════════════════════════════════════════════════════════════════
-# ML SENSORS — load trained models as real-time prediction streams
-# ════════════════════════════════════════════════════════════════════
 
 _ml_sensors: dict[str, MLPredictionSensor] = {}
 _csv_replays: dict[str, dict] = {}
@@ -418,7 +395,6 @@ def start_ml_sensor(req: MLSensorStartRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _ml_sensors[req.uid] = sensor
 
-    # Ensure the active dashboard session immediately sees the new ML LSL outlet.
     if session.status == "Online":
         try:
             session.refresh()
@@ -464,5 +440,4 @@ def list_ml_sensors():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 

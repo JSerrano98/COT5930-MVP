@@ -13,6 +13,8 @@ const NODE_TYPE_LABELS = {
 
 const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef, children }) => {
   const [latencyMs, setLatencyMs] = useState(null);
+  const streamRateHz = Number(stream?.rate ?? 0);
+  const expectedIntervalMs = streamRateHz > 0 ? 1000 / streamRateHz : null;
 
   useEffect(() => {
     if (!dataRef || !stream) return;
@@ -27,21 +29,38 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
   }, [dataRef, stream]);
 
   const latencyColor =
-    latencyMs === null  ? '#475569' :  // no data — slate
-    latencyMs < 100     ? '#22c55e' :  // green  < 100 ms
-    latencyMs < 300     ? '#eab308' :  // yellow < 300 ms
-                          '#ef4444';   // red    ≥ 300 ms
+    latencyMs === null ? '#475569' :
+    expectedIntervalMs
+      ? latencyMs < expectedIntervalMs * 1.5
+        ? '#22c55e'
+        : latencyMs < expectedIntervalMs * 3
+          ? '#eab308'
+          : '#ef4444'
+      : latencyMs < 100
+        ? '#22c55e'
+        : latencyMs < 300
+          ? '#eab308'
+          : '#ef4444';
 
   const latencyLabel =
-    latencyMs === null ? 'No data' :
-    latencyMs < 100    ? `Good (${latencyMs} ms)` :
-    latencyMs < 300    ? `Fair (${latencyMs} ms)` :
-                         `Poor (${latencyMs} ms)`;
+    latencyMs === null
+      ? 'No data'
+      : expectedIntervalMs
+        ? latencyMs < expectedIntervalMs * 1.5
+          ? `Good (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
+          : latencyMs < expectedIntervalMs * 3
+            ? `Fair (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
+            : `Poor (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
+        : latencyMs < 100
+          ? `Good (${latencyMs} ms)`
+          : latencyMs < 300
+            ? `Fair (${latencyMs} ms)`
+            : `Poor (${latencyMs} ms)`;
 
   return (
   <div className="flex flex-col bg-echo-surface border border-echo-border overflow-hidden w-full h-full">
 
-    {/* Header — drag handle */}
+    {/* Header - drag handle */}
     <div className="monitor-drag flex items-center gap-2 px-3 py-1.5 border-b border-echo-border bg-echo-surface flex-shrink-0 cursor-grab active:cursor-grabbing select-none">
 
       {/* Drag grip icon */}
@@ -61,7 +80,7 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
         </span>
       )}
 
-      {/* Color picker — waveform only */}
+      {/* Color picker - waveform only */}
       {nodeType === 'waveform' && onColorChange && (
         <label className="cursor-pointer flex-shrink-0" title="Trace color">
           <input

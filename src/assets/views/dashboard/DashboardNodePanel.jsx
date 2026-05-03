@@ -118,7 +118,7 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, on
                       <div className="flex items-start justify-between mb-2">
                         <div className="min-w-0">
                           <p className="text-[11px] font-ui font-semibold text-white truncate">{stream.name}</p>
-                          <p className="text-[10px] text-echo-dim font-body mt-0.5">
+                          <p className="text-[10px] text-echo-green font-body mt-0.5">
                             {stream.channels}ch · {stream.rate}Hz
                           </p>
                         </div>

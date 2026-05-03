@@ -37,7 +37,6 @@ def run(config: dict, upstream):
     task      = config.get("task",  "classification")
     params    = config.get("params", {})
 
-    # Neural models — return a spec dict; Trainer will build the actual model
     neural = {"mlp", "cnn1d", "lstm", "eegnet"}
     if model_key in neural:
         model_obj = {"_type": "neural", "arch": model_key, "params": params, "task": task}
@@ -46,7 +45,6 @@ def run(config: dict, upstream):
 
     result = {"model": model_key, "task": task}
 
-    # Pass splits through alongside the model object
     if isinstance(upstream, dict):
         upstream["model_obj"] = model_obj
         upstream["model_key"] = model_key

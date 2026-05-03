@@ -70,7 +70,7 @@ const Navbar = () => {
         </NavLink>
       </div>
 
-      {/* Dead space — dev consoles when devMode is on, spacer otherwise */}
+      {/* Dead space - dev consoles when devMode is on, spacer otherwise */}
       {devMode && !collapsed ? (
         <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-echo-border flex-1 min-h-0">
           <BackendConsole />

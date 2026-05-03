@@ -2,22 +2,15 @@ import { useState, useEffect } from 'react';
 import Toggle from '../../components/ToggleSwitch';
 import { useDevMode } from '../../context/DevModeContext';
 
-const isElectron = Boolean(window.echo?.pickFolder);
-
 const PathSetting = ({ label, description, storageKey, defaultValue, electronGetter }) => {
   const [value, setValue] = useState(() => localStorage.getItem(storageKey) || '');
 
-  // Seed from Electron on first load if localStorage is empty
   useEffect(() => {
     if (localStorage.getItem(storageKey)) return; // already set
-    if (electronGetter && window.echo?.[electronGetter]) {
-      window.echo[electronGetter]().then((p) => {
-        if (p) { setValue(p); localStorage.setItem(storageKey, p); }
-        else    { setValue(defaultValue); }
-      }).catch(() => setValue(defaultValue));
-    } else {
-      setValue(defaultValue);
-    }
+    window.echo[electronGetter]().then((p) => {
+      if (p) { setValue(p); localStorage.setItem(storageKey, p); }
+      else    { setValue(defaultValue); }
+    }).catch(() => setValue(defaultValue));
   }, []);
 
   const handleChange = (v) => {
@@ -43,14 +36,12 @@ const PathSetting = ({ label, description, storageKey, defaultValue, electronGet
           className="flex-1 bg-echo-surface-2 border border-echo-border text-white text-xs px-3 py-2 focus:border-echo-green font-body truncate"
           spellCheck={false}
         />
-        {isElectron && (
-          <button
-            onClick={handleBrowse}
-            className="px-3 py-2 text-[9px] font-ui font-semibold tracking-widest uppercase border border-echo-border text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
-          >
-            Browse
-          </button>
-        )}
+        <button
+          onClick={handleBrowse}
+          className="px-3 py-2 text-[9px] font-ui font-semibold tracking-widest uppercase border border-echo-border text-echo-muted hover:border-echo-muted hover:text-white transition-colors"
+        >
+          Browse
+        </button>
       </div>
     </div>
   );
@@ -88,6 +79,20 @@ const Settings = () => {
             storageKey="echo_recordings_dir"
             defaultValue="backend/recordings"
             electronGetter="getDefaultRecordingPath"
+          />
+          <PathSetting
+            label="Cleaned Datasets Directory"
+            description="Where cleaned ML datasets are saved by default."
+            storageKey="echo_cleaned_dir"
+            defaultValue="backend/data/CSV/cleaned"
+            electronGetter="getDefaultCleanedPath"
+          />
+          <PathSetting
+            label="Dashboard Workspaces Directory"
+            description="Where dashboard monitor workspace JSON files are saved by default."
+            storageKey="echo_workspaces_dir"
+            defaultValue="backend/workspaces"
+            electronGetter="getDefaultWorkspacePath"
           />
         </div>
       </div>

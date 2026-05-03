@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDevMode } from '../context/DevModeContext';
 
-// Map a log line to a Tailwind text color class based on log level keywords
 const lineColor = (line) => {
   const u = line.toUpperCase();
   if (/\bCRITICAL\b|\bFATAL\b/.test(u))     return 'text-red-400 font-semibold';

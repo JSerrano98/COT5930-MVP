@@ -1,16 +1,14 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const BACKEND = 'http://localhost:8000';
 const FADE_MS = 400;
 
 /**
  * SplashScreen
  *
  * In Electron: listens for startup events from the main process.
- *   Main handles: backend start → session start → emits startup:ready
+ *   Main handles: backend start to session start to emits startup:ready
  *   Splash just shows progress and dismisses when ready fires.
  *
- * In browser (dev without Electron): falls back to polling /health.
  */
 const SplashScreen = ({ onReady }) => {
   const [status, setStatus] = useState('Starting…');
@@ -26,39 +24,14 @@ const SplashScreen = ({ onReady }) => {
   };
 
   useEffect(() => {
-    // ── Electron path ────────────────────────────────────────────────────────
-    if (window.echo?.onStartupReady) {
-      // Main process may have already finished before this component mounted
-      // (e.g. HMR reload). Check current status immediately.
-      window.echo.getStartupStatus().then(({ done, sessionRunning }) => {
-        if (done) {
-          finish();
-          return;
-        }
-        // Not done — subscribe to progress events
-        window.echo.onStartupStatus((msg) => setStatus(msg));
-        window.echo.onStartupReady(() => finish());
-      });
-      return;
-    }
-
-    // ── Browser fallback: poll /health ───────────────────────────────────────
-    let cancelled = false;
-    setStatus('Waiting for backend…');
-
-    const poll = async () => {
-      while (!cancelled) {
-        try {
-          const res = await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(2000) });
-          if (res.ok) { finish(); return; }
-        } catch { /* still waiting */ }
-        await new Promise((r) => setTimeout(r, 500));
+    window.echo.getStartupStatus().then(({ done }) => {
+      if (done) {
+        finish();
+        return;
       }
-    };
-
-    poll();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      window.echo.onStartupStatus((msg) => setStatus(msg));
+      window.echo.onStartupReady(() => finish());
+    });
   }, []);
 
   return (

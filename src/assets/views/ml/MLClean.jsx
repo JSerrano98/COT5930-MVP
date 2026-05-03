@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react';
 
 const BACKEND = 'http://localhost:8000';
 
+const CLEAN_CACHE_KEY = 'echo_ml_clean_cache';
+
+const loadCleanCache = (path) => {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CLEAN_CACHE_KEY) ?? 'null');
+    return cache?.datasetPath === path ? cache : null;
+  } catch { return null; }
+};
+
+const saveCleanCache = (data) => {
+  try { localStorage.setItem(CLEAN_CACHE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+};
+
 const ACTION_OPTIONS = [
   { value: 'keep',        label: 'Keep as-is' },
   { value: 'fill_mean',   label: 'Fill nulls: Mean' },
@@ -25,39 +38,99 @@ const Badge = ({ children, color }) => {
   );
 };
 
+const ProgressBar = ({ pct, label }) => (
+  <div className="flex flex-col gap-2 py-6">
+    <div className="flex items-center justify-between">
+      {label && <p className="text-[10px] font-ui font-semibold uppercase tracking-widest text-echo-muted">{label}</p>}
+      <p className="text-[10px] font-ui font-semibold text-echo-green ml-2 tabular-nums">{pct}%</p>
+    </div>
+    <div className="h-0.5 w-full bg-echo-border">
+      <div
+        className="h-full bg-echo-green transition-[width] duration-150"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  </div>
+);
+
 const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
-  const [profile, setProfile]             = useState(null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState('');
-  const [dropDuplicates, setDropDuplicates] = useState(false);
-  const [ops, setOps]                     = useState({});   // { colName: action }
-  const [bulkAction, setBulkAction]       = useState('fill_mean');
-  const [applying, setApplying]           = useState(false);
-  const [cleanResult, setCleanResult]     = useState(null);
+  const [profile, setProfile]               = useState(() => loadCleanCache(intake.datasetPath)?.profile ?? null);
+  const [loading, setLoading]               = useState(() => !loadCleanCache(intake.datasetPath)?.profile);
+  const [error, setError]                   = useState('');
+  const [dropDuplicates, setDropDuplicates] = useState(() => loadCleanCache(intake.datasetPath)?.dropDuplicates ?? false);
+  const [ops, setOps]                       = useState(() => loadCleanCache(intake.datasetPath)?.ops ?? {});   // { colName: action }
+  const [bulkAction, setBulkAction]         = useState('fill_mean');
+  const [applying, setApplying]             = useState(false);
+  const [cleanResult, setCleanResult]       = useState(() => loadCleanCache(intake.datasetPath)?.cleanResult ?? null);
+  const [profileProgress, setProfileProgress] = useState({ pct: 0, label: '' });
+  const [applyProgress, setApplyProgress]     = useState({ pct: 0, label: '' });
 
   useEffect(() => {
+    const cached = loadCleanCache(intake.datasetPath);
+    if (cached?.profile) {
+      setProfile(cached.profile);
+      setOps(cached.ops ?? {});
+      setDropDuplicates(cached.dropDuplicates ?? false);
+      setCleanResult(cached.cleanResult ?? null);
+      setLoading(false);
+      setError('');
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
+    setProfileProgress({ pct: 0, label: 'Starting…' });
     setError('');
-    fetch(`${BACKEND}/ml/workbench/profile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataset_path: intake.datasetPath }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.detail) throw new Error(data.detail);
-        setProfile(data);
-        // default all cols to 'keep'
-        const defaults = {};
-        (data.columns ?? []).forEach((c) => { defaults[c.name] = 'keep'; });
-        setOps(defaults);
-      })
-      .catch((e) => { if (!cancelled) setError(String(e.message ?? e)); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    setProfile(null);
+    setOps({});
+    setDropDuplicates(false);
+
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND}/ml/workbench/profile/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataset_path: intake.datasetPath }),
+        });
+        if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const evt = JSON.parse(line.slice(6));
+            if (cancelled) return;
+            if (evt.error) throw new Error(evt.error);
+            setProfileProgress({ pct: evt.pct, label: evt.label });
+            if (evt.result !== undefined) {
+              const data = evt.result;
+              setProfile(data);
+              const defaults = {};
+              (data.columns ?? []).forEach((c) => { defaults[c.name] = 'keep'; });
+              setOps(defaults);
+            }
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setError(String(e.message ?? e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; };
   }, [intake.datasetPath]);
+
+  useEffect(() => {
+    if (!profile) return;
+    saveCleanCache({ datasetPath: intake.datasetPath, profile, ops, dropDuplicates, cleanResult });
+  }, [intake.datasetPath, profile, ops, dropDuplicates, cleanResult]);
 
   const setOp = (col, action) => setOps((prev) => ({ ...prev, [col]: action }));
 
@@ -74,6 +147,7 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
 
   const apply = async () => {
     setApplying(true);
+    setApplyProgress({ pct: 0, label: 'Starting…' });
     setError('');
     setCleanResult(null);
     try {
@@ -81,21 +155,37 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
         .filter(([, action]) => action !== 'keep')
         .map(([col, action]) => ({ col, action }));
 
-      const res  = await fetch(`${BACKEND}/ml/workbench/clean`, {
+      const res = await fetch(`${BACKEND}/ml/workbench/clean/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dataset_path: intake.datasetPath,
           drop_duplicates: dropDuplicates,
           column_ops,
+          clean_dir: localStorage.getItem('echo_cleaned_dir') || '',
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Cleaning failed');
-
-      // update the dataset path to the cleaned file for downstream steps
-      onIntakeChange({ datasetPath: data.cleaned_path });
-      setCleanResult(data);
+      if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const evt = JSON.parse(line.slice(6));
+          if (evt.error) throw new Error(evt.error);
+          setApplyProgress({ pct: evt.pct, label: evt.label });
+          if (evt.result !== undefined) {
+            onIntakeChange({ datasetPath: evt.result.cleaned_path });
+            setCleanResult(evt.result);
+          }
+        }
+      }
     } catch (e) {
       setError(String(e.message ?? e));
     } finally {
@@ -119,13 +209,7 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
         >
           Back
         </button>
-        <div>
-          <h1 className="font-title text-2xl tracking-[0.1em] text-white">DATA CLEANING</h1>
-          <p className="text-[10px] text-echo-dim font-body">
-            {intake.datasetPath.split(/[\\/]/).pop()}
-            {profile && ` · ${profile.rows} rows · ${profile.columns?.length} columns`}
-          </p>
-        </div>
+        
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={onContinue}
@@ -152,10 +236,17 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
         </div>
       </div>
 
+      {/* Apply progress bar */}
+      {applying && (
+        <div className="px-6 pt-3 flex-shrink-0">
+          <ProgressBar pct={applyProgress.pct} label={applyProgress.label} />
+        </div>
+      )}
+
       {/* Body */}
       <div className="flex-1 overflow-auto p-6">
         {loading && (
-          <p className="text-sm text-echo-muted font-body">Loading dataset profile…</p>
+          <ProgressBar pct={profileProgress.pct} label={profileProgress.label} />
         )}
         {error && (
           <div className="mb-4 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-body">

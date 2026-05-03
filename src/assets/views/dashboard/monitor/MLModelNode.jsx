@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import WaveformNode from './WaveformNode';
 
 const API_URL = 'http://localhost:8000';
 
@@ -54,6 +53,15 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   const prediction = sample[0];
   const confidence = sample[1];
   const modelStream = monitor.stream;
+  const hasConfidence = Array.isArray(modelStream?.channel_labels)
+    ? modelStream.channel_labels.includes('confidence')
+    : Number(modelStream?.channels || 0) > 1;
+  const formattedPrediction = Number.isFinite(Number(prediction))
+    ? Number(prediction).toFixed(4)
+    : (prediction ?? '--');
+  const formattedConfidence = Number.isFinite(Number(confidence))
+    ? `${(Number(confidence) * 100).toFixed(1)}%`
+    : '--';
   const selectedSourceNames = Array.isArray(monitor.sourceNames)
     ? monitor.sourceNames
     : (monitor.sourceName ? [monitor.sourceName] : []);
@@ -107,15 +115,40 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     [autoAliases, manualAliases],
   );
 
+  const backendKeySet = useMemo(() => {
+    const keys = new Set();
+    availableChannels.forEach((ch) => {
+      keys.add(ch.label);
+      keys.add(ch.lookup);
+    });
+    return keys;
+  }, [availableChannels]);
+
+  const validEffectiveAliases = useMemo(
+    () => Object.fromEntries(
+      Object.entries(effectiveAliases).filter(([, lookup]) => backendKeySet.has(String(lookup))),
+    ),
+    [effectiveAliases, backendKeySet],
+  );
+
+  const isFeatureMatched = useMemo(() => {
+    const out = {};
+    (modelMeta?.feature_cols || []).forEach((feature) => {
+      const alias = validEffectiveAliases[feature];
+      out[feature] = Boolean(alias ? backendKeySet.has(alias) : backendKeySet.has(feature));
+    });
+    return out;
+  }, [modelMeta, validEffectiveAliases, backendKeySet]);
+
   const matchedCount = useMemo(() => {
     if (!modelMeta?.feature_cols?.length) return 0;
-    return modelMeta.feature_cols.filter((f) => !!effectiveAliases[f]).length;
-  }, [modelMeta, effectiveAliases]);
+    return modelMeta.feature_cols.filter((f) => isFeatureMatched[f]).length;
+  }, [modelMeta, isFeatureMatched]);
 
   const unresolvedFeatures = useMemo(() => {
     if (!modelMeta?.feature_cols?.length) return [];
-    return modelMeta.feature_cols.filter((f) => !effectiveAliases[f]);
-  }, [modelMeta, effectiveAliases]);
+    return modelMeta.feature_cols.filter((f) => !isFeatureMatched[f]);
+  }, [modelMeta, isFeatureMatched]);
 
   useEffect(() => {
     const path = (monitor.modelPath || '').trim();
@@ -165,7 +198,8 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     const cleanedManual = Object.fromEntries(
       Object.entries(manualAliases).filter(([feature, lookup]) => {
         if (!modelMeta.feature_cols.includes(feature)) return false;
-        return String(lookup).trim().length > 0;
+        const key = String(lookup).trim();
+        return key.length > 0 && backendKeySet.has(key);
       }),
     );
 
@@ -185,10 +219,10 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     monitor.running,
     onPatch,
     selectedSourceNames,
+    backendKeySet,
   ]);
 
   const pickModel = async () => {
-    if (!window.echo?.pickFile) return;
     const defaultPath = monitor.modelPath || (await window.echo.getDefaultModelPath?.()) || undefined;
     const picked = await window.echo.pickFile({
       defaultPath,
@@ -201,13 +235,33 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   };
 
   const startModelSensor = async () => {
+    if (monitor.running || busy) return;
+
     if (!monitor.modelPath?.trim()) {
       setError('Choose a model file first.');
       return;
     }
-    if (selectedSourceNames.length === 0) {
-      setError('Choose at least one source stream.');
+
+    if (!modelMeta) {
+      setError('Model metadata is still loading. Wait for feature mapping to finish.');
       return;
+    }
+
+    if ((modelMeta.feature_cols?.length ?? 0) > 0 && matchedCount < modelMeta.feature_cols.length) {
+      setError(`Feature mapping incomplete (${matchedCount}/${modelMeta.feature_cols.length}).`);
+      return;
+    }
+
+    const requestedSources = selectedSourceNames.length
+      ? selectedSourceNames
+      : streams.map((s) => s.name);
+    if (requestedSources.length === 0) {
+      setError('No source streams available yet. Start sensors and try again.');
+      return;
+    }
+
+    if (selectedSourceNames.length === 0) {
+      onPatch({ sourceNames: requestedSources, sourceName: requestedSources[0] || '' });
     }
 
     setBusy(true);
@@ -220,13 +274,13 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
       const payload = {
         uid: sensorUid,
         name: sensorName,
-        source_name: selectedSourceNames[0],
-        source_names: selectedSourceNames,
+        source_name: requestedSources[0],
+        source_names: requestedSources,
         source_type: monitor.sourceType || '',
         model_path: monitor.modelPath,
         buffer_seconds: monitor.bufferSeconds ?? 2.0,
         process_interval: monitor.processInterval ?? 0.1,
-        feature_aliases: effectiveAliases,
+        feature_aliases: validEffectiveAliases,
       };
 
       const res = await fetch(`${API_URL}/ml-sensors/start`, {
@@ -242,10 +296,16 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
       onPatch({
         sensorUid,
         sensorName,
-        sourceNames: selectedSourceNames,
-        featureAliases: manualAliases,
+        sourceNames: requestedSources,
+        featureAliases: validEffectiveAliases,
         running: true,
-        stream: { name: sensorName, type: 'ML', channels: 2, rate: 1, channel_labels: ['prediction', 'confidence'] },
+        stream: data.stream || {
+          name: sensorName,
+          type: 'ML',
+          channels: 1,
+          rate: 0,
+          channel_labels: ['prediction'],
+        },
       });
     } catch (e) {
       setError(String(e.message ?? e));
@@ -273,7 +333,10 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   };
 
   return (
-    <div className="h-full w-full overflow-auto bg-echo-surface p-2 text-white">
+    <div
+      className="h-full w-full overflow-auto bg-echo-surface p-2 text-white"
+      onWheelCapture={(e) => e.stopPropagation()}
+    >
       <div className="space-y-2">
         {!monitor.running && (
           <div className="block">
@@ -395,14 +458,12 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
                 placeholder="path/to/model.pkl"
                 className="min-w-0 flex-1 border border-echo-border bg-echo-surface-2 px-2 py-1 text-xs text-white outline-none focus:border-echo-green"
               />
-              {!!window.echo?.pickFile && (
-                <button
-                  onClick={pickModel}
-                  className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-muted hover:border-echo-green hover:text-white"
-                >
-                  BROWSE
-                </button>
-              )}
+              <button
+                onClick={pickModel}
+                className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-muted hover:border-echo-green hover:text-white"
+              >
+                BROWSE
+              </button>
             </div>
             <p className="mt-1 text-[10px] text-echo-muted">Default folder: Documents/ECHO Trained Models</p>
           </label>
@@ -424,13 +485,20 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
 
         {monitor.running && modelStream && (
           <>
-            <div className="mt-2 h-40 overflow-hidden border border-echo-border bg-[#070d18]">
-              <WaveformNode stream={modelStream} dataRef={dataRef} lineColor="#07dd96" />
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <div className="border border-echo-border bg-echo-surface-2 px-2 py-2">
+                <p className="text-[9px] uppercase tracking-widest text-echo-dim">Prediction</p>
+                <p className="mt-1 font-mono text-xl text-echo-green">{formattedPrediction}</p>
+              </div>
+              <div className="border border-echo-border bg-echo-surface-2 px-2 py-2">
+                <p className="text-[9px] uppercase tracking-widest text-echo-dim">Confidence</p>
+                <p className="mt-1 font-mono text-xl text-white">{hasConfidence ? formattedConfidence : 'N/A'}</p>
+              </div>
             </div>
 
-            <div className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[11px] text-echo-muted">
-              <p>Prediction: <span className="font-mono text-white">{prediction ?? '--'}</span></p>
-              <p>Confidence: <span className="font-mono text-white">{confidence ?? '--'}</span></p>
+            <div className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] text-echo-muted">
+              <p>Stream: <span className="font-mono text-white">{modelStream.name}</span></p>
+              <p>Rate: <span className="font-mono text-white">{modelStream.rate || 0} Hz</span></p>
             </div>
 
             <button

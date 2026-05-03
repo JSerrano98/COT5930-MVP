@@ -17,7 +17,6 @@ export const AlertProvider = ({ children }) => {
   const pushAlert = useCallback(({ type = 'error', title, message, ttl = 8000 }) => {
     const id = `alert_${++_seq}`;
     setAlerts(prev => {
-      // Deduplicate by title — don't stack the same alert repeatedly
       if (prev.some(a => a.title === title)) return prev;
       return [...prev, { id, type, title, message }];
     });

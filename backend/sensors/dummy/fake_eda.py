@@ -31,7 +31,6 @@ class FakeEDA(DummySensor):
         self._rng = np.random.default_rng(seed=24)
 
     def _scr_event_probability(self, dt: float) -> float:
-        # Resting SCR frequency typically falls around 1-5 responses/min.
         target_per_min = 2.5 + 0.8 * np.sin(2 * np.pi * self._t / 120.0)
         return max(0.0, target_per_min / 60.0) * dt
 
@@ -39,12 +38,10 @@ class FakeEDA(DummySensor):
         dt = 1.0 / self.sample_rate
         self._t += dt
 
-        # Slow tonic drift (skin conductance level).
         tonic_target = 4.2 + 0.4 * np.sin(2 * np.pi * self._t / 180.0)
         self.tonic_uS += (tonic_target - self.tonic_uS) * dt / 35.0
         self.tonic_uS += float(self._rng.normal(0.0, 0.0015))
 
-        # Random phasic skin-conductance responses (Bateman function).
         if self._rng.random() < self._scr_event_probability(dt):
             amp = float(self._rng.uniform(0.05, 0.45))
             self._events.append((self._t, amp))
