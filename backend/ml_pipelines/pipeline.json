@@ -1,0 +1,18 @@
+{
+  "name": "",
+  "nodes": [
+    {
+      "id": "trainer_9_1777756977912",
+      "type": "trainer",
+      "position": {
+        "x": 38.84461570810004,
+        "y": 210.59967824990466
+      },
+      "config": {},
+      "label": "Trainer",
+      "style": {}
+    }
+  ],
+  "edges": [],
+  "train_node_id": null
+}

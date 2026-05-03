@@ -61,8 +61,6 @@ async def run_pipeline(pipeline: PipelineSchema):
     """Execute the full ML pipeline and return per-node results."""
     try:
         result = execute(pipeline.model_dump())
-        print('this is the final result')
-        print(result)
         return result
     except Exception as exc:
         logger.error("Pipeline execution failed: %s", exc)

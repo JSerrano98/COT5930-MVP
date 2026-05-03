@@ -1,0 +1,160 @@
+{
+  "name": "mypipe",
+  "nodes": [
+    {
+      "id": "data_loader_1_1777756820332",
+      "type": "data_loader",
+      "position": {
+        "x": -137.0,
+        "y": 80.0
+      },
+      "config": {
+        "source": "csv",
+        "path": "data/CSV/Salary_dataset.csv",
+        "label": "Salary",
+        "sep": ","
+      },
+      "label": "Data Loader",
+      "style": {}
+    },
+    {
+      "id": "preprocessor_2_1777756847312",
+      "type": "preprocessor",
+      "position": {
+        "x": 270.79942748164814,
+        "y": 89.8708128073589
+      },
+      "config": {},
+      "label": "Preprocessor",
+      "style": {}
+    },
+    {
+      "id": "feature_3_1777756853920",
+      "type": "feature",
+      "position": {
+        "x": 635.0675864549424,
+        "y": 30.599595485783297
+      },
+      "config": {
+        "features": [
+          "mean",
+          "std",
+          "band_power_alpha"
+        ],
+        "windowSize": "2",
+        "overlap": 0.5
+      },
+      "label": "Feature",
+      "style": {}
+    },
+    {
+      "id": "split_5_1777756880398",
+      "type": "split",
+      "position": {
+        "x": -70.38622791862542,
+        "y": 422.4956846461561
+      },
+      "config": {
+        "testSize": 0.2,
+        "valSize": 0.1,
+        "strategy": "random",
+        "shuffle": true,
+        "seed": 42
+      },
+      "label": "Split",
+      "style": {}
+    },
+    {
+      "id": "trainer_7_1777756887959",
+      "type": "trainer",
+      "position": {
+        "x": 743.4071916364642,
+        "y": 387.40382258407647
+      },
+      "config": {
+        "epochs": 50,
+        "batchSize": 32,
+        "lr": 0.001,
+        "cv": 0,
+        "earlyStop": true,
+        "patience": 10,
+        "modelName": "mymodel"
+      },
+      "label": "Trainer",
+      "style": {}
+    },
+    {
+      "id": "evaluator_8_1777756893791",
+      "type": "evaluator",
+      "position": {
+        "x": 1160.2162231162797,
+        "y": 392.64150674939594
+      },
+      "config": {},
+      "label": "Evaluator",
+      "style": {}
+    },
+    {
+      "id": "model_11_1777757158130",
+      "type": "model",
+      "position": {
+        "x": 288.7667518128111,
+        "y": 475.1621223676466
+      },
+      "config": {
+        "model": "ridge",
+        "task": "regression",
+        "params": {
+          "alpha": 1
+        }
+      },
+      "label": "Model",
+      "style": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-data_loader_1_1777756820332-preprocessor_2_1777756847312",
+      "source": "data_loader_1_1777756820332",
+      "target": "preprocessor_2_1777756847312",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-preprocessor_2_1777756847312-feature_3_1777756853920",
+      "source": "preprocessor_2_1777756847312",
+      "target": "feature_3_1777756853920",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-feature_3_1777756853920-split_5_1777756880398",
+      "source": "feature_3_1777756853920",
+      "target": "split_5_1777756880398",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-trainer_7_1777756887959-evaluator_8_1777756893791",
+      "source": "trainer_7_1777756887959",
+      "target": "evaluator_8_1777756893791",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-split_5_1777756880398-model_11_1777757158130",
+      "source": "split_5_1777756880398",
+      "target": "model_11_1777757158130",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "reactflow__edge-model_11_1777757158130-trainer_7_1777756887959",
+      "source": "model_11_1777757158130",
+      "target": "trainer_7_1777756887959",
+      "sourceHandle": null,
+      "targetHandle": null
+    }
+  ],
+  "train_node_id": null
+}

@@ -1,6 +1,18 @@
 {
   "name": "Untitled Pipeline",
-  "nodes": [],
+  "nodes": [
+    {
+      "id": "data_loader_1_1777756778998",
+      "type": "data_loader",
+      "position": {
+        "x": 121.0,
+        "y": 130.88062540690103
+      },
+      "config": {},
+      "label": "Data Loader",
+      "style": {}
+    }
+  ],
   "edges": [],
   "train_node_id": null
 }

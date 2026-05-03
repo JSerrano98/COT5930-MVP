@@ -1,10 +1,13 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNodesState, useEdgesState } from 'reactflow';
 import MLHeader    from './MLHeader';
 import MLNodePanel from './MLNodePanel';
 import MLCanvas    from './MLCanvas';
 
 const BACKEND = 'http://localhost:8000';
+
+
+
 
 /**
  * Serialize the current ReactFlow graph into the pipeline JSON format
@@ -34,10 +37,14 @@ const MachineLearning = () => {
   const [pipelineName, setPipelineName]  = useState('Untitled Pipeline');
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [pipelineStatus, setPipelineStatus] = useState('idle');
-
+  const nodesRef = useRef(nodes);
   // Track per-node config patches outside of ReactFlow state
   // (avoids stale closure issues when nodes mutate rapidly)
   const configsRef = useRef({});
+
+  useEffect(() => {
+  nodesRef.current = nodes;
+}, [nodes]);
 
   // ── Node config updates ────────────────────────────────────────────
   const handleNodeConfig = useCallback((id, patch) => {
@@ -69,7 +76,8 @@ const MachineLearning = () => {
       ...n,
       data: { ...n.data, config: configsRef.current[n.id] ?? n.data?.config ?? {} },
     }));
-
+    console.log('this is a snapshot update')
+    console.log(snapshot)
     const pipeline = serializePipeline(pipelineName, snapshot, edges);
     pipeline.train_node_id = trainerId;
 
@@ -106,6 +114,7 @@ const MachineLearning = () => {
 
   // ── Save pipeline ──────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
+    console.log('save attempted')
     const snapshot = nodes.map(n => ({
       ...n,
       data: { ...n.data, config: configsRef.current[n.id] ?? n.data?.config ?? {} },
@@ -127,6 +136,7 @@ const MachineLearning = () => {
 
   // ── Load pipeline ──────────────────────────────────────────────────
   const handleLoad = useCallback(async () => {
+    console.log('load attempted');
     const name = window.prompt('Pipeline name to load:');
     if (!name) return;
 
@@ -153,15 +163,23 @@ const MachineLearning = () => {
       }));
 
       restored.forEach(n => { configsRef.current[n.id] = n.data.config; });
-
+    
       setNodes(restored);
       setEdges((pipeline.edges ?? []).map(e => ({ ...e, animated: true, style: { stroke: '#64748b' } })));
+    
       setPipelineStatus('idle');
+      console.log(restored);
+      console.log(nodes);
     } catch (err) {
       console.error('[ML] Load failed:', err);
     }
   }, [handleNodeConfig, handleRemoveNode, handleTrain, setNodes, setEdges]);
 
+  useEffect(() => {
+  if (nodes.length > 0) {
+    console.log('Nodes updated in state:', nodes);
+  }
+}, [nodes]);
   // ── Export JSON (download) ─────────────────────────────────────────
   const handleExportJSON = useCallback(() => {
     const snapshot = nodes.map(n => ({

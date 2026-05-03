@@ -65,28 +65,25 @@ def execute(pipeline: dict) -> dict:
     nodes_raw  = pipeline.get("nodes", [])
     edges_raw  = pipeline.get("edges", [])
     train_node = pipeline.get("train_node_id")
-    print('this is the train node id', train_node)
     nodes_by_id = {n["id"]: n for n in nodes_raw}
     node_ids    = list(nodes_by_id.keys())
 
     order = _topo_sort(node_ids, edges_raw)
-
+    print(nodes_raw)
+    print('this is the order', order)
     # Map: node_id → output data (DataFrame or splits dict)
     outputs: dict[str, Any] = {}
     node_results: list[dict] = []
     trainer_result: dict = {}
     upstream_config = {}
     up = {}
-    #print('these are the raw nodes:', nodes_raw)
 
-    #print('this is what is stored in order:', order)
     for nid in order:
         node   = nodes_by_id[nid]
         ntype  = node["type"]
         config = node.get("config", {})
         upstream_config |= config
-        #print('node information')
-        print(node)
+       # print(node)
         runner = NODE_RUNNERS.get(ntype)
         if runner is None:
             logger.warning("No runner for node type '%s' — skipping.", ntype)
@@ -108,6 +105,8 @@ def execute(pipeline: dict) -> dict:
             upstream = all_upstreams  # list — Ensemble runner handles this
 
         logger.info("Executing node %s [%s]", nid, ntype)
+        logger.info('this is the upstream', upstream)
+        logger.info('this is the config information', upstream_config)
         try:
             result, output = runner(upstream_config, upstream)
         except Exception as exc:

@@ -1,0 +1,18 @@
+{
+  "name": "test",
+  "nodes": [
+    {
+      "id": "ensemble_10_1777757016635",
+      "type": "ensemble",
+      "position": {
+        "x": 171.06990850040438,
+        "y": 248.12307215042344
+      },
+      "config": {},
+      "label": "Ensemble",
+      "style": {}
+    }
+  ],
+  "edges": [],
+  "train_node_id": null
+}
