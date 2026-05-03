@@ -59,9 +59,7 @@ async function runStartup() {
     sendStartupStatus(`Session error: ${e.message}`)
   }
 
-  sendStartupStatus('Starting sensors…')
-  runScript('Start All Sensors')
-
+  // Keep sensor launch scripts manual-only; do not auto-run dev tools on app start.
   startupDone = true
   win?.webContents?.send('startup:ready', { sessionRunning })
 }

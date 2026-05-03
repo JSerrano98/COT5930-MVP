@@ -481,8 +481,15 @@ class MLSensor(DerivedSensor):
             inlet = StreamInlet(info, max_buflen=int(self.buffer_seconds + 1))
             inlet.open_stream()
 
-            labels = self._extract_channel_labels(info)
-            channels = info.channel_count()
+            # Resolve channel labels from full inlet metadata; resolve_byprop()
+            # may return minimal info without channel descriptors.
+            try:
+                full_info = inlet.info(timeout=3.0)
+            except Exception:
+                full_info = info
+
+            labels = self._extract_channel_labels(full_info)
+            channels = full_info.channel_count()
             if len(labels) != channels:
                 labels = [f"{source}_ch{i+1}" for i in range(channels)]
 
@@ -573,6 +580,19 @@ class MLSensor(DerivedSensor):
                         if norm_tail in normalized_lookup:
                             matched_value = normalized_lookup[norm_tail]
                             break
+
+                if matched_value is None:
+                    # Fuzzy fallback for common feature naming variants,
+                    # e.g. EDA1 -> eda_uS, RESP -> resp_belt_au, TEMP -> temp_c.
+                    norm_feature = self._normalize_feature_key(feature)
+                    base_feature = re.sub(r"\d+$", "", norm_feature)
+                    if base_feature:
+                        starts = [k for k in normalized_lookup.keys() if k.startswith(base_feature)]
+                        contains = [k for k in normalized_lookup.keys() if base_feature in k]
+                        fuzzy_keys = starts or contains
+                        if fuzzy_keys:
+                            best_key = min(fuzzy_keys, key=len)
+                            matched_value = normalized_lookup[best_key]
 
                 if matched_value is None:
                     missing.append(feature)

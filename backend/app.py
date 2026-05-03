@@ -402,10 +402,9 @@ def start_ml_sensor(req: MLSensorStartRequest):
     _ml_sensors[req.uid] = sensor
 
     if session.status == "Online":
-        try:
-            session.refresh()
-        except Exception as exc:
-            logging.warning(f"Failed to refresh session after ML sensor start: {exc}")
+        attached = session.attach_stream(req.name, stream_type="ML", timeout=2.0, replace_same_name=True)
+        if not attached:
+            logging.warning(f"ML stream '{req.name}' was not attached to session manager (may already be attached)")
 
     return {
         "ok": True,
@@ -430,6 +429,10 @@ def stop_ml_sensor(uid: str):
     if sensor is None:
         return {"ok": False, "error": f"No ML sensor with uid '{uid}'"}
     sensor.stop()
+
+    if session.status == "Online":
+        session.detach_stream(sensor.name, stream_type="ML")
+
     return {"ok": True, "uid": uid}
 
 

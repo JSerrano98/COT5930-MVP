@@ -12,13 +12,13 @@ export const useDashboardWebSocket = () => {
   const reconnectTimer = useRef(null);
   const manualDisconnect = useRef(false);
 
-  const fetchStreams = useCallback(async () => {
-    setLoading(true);
+  const fetchStreams = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`${API_URL}/streams`);
       if (res.ok) setStreams(await res.json());
     } catch { /* server may not be up yet */ }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   const refreshStreams = useCallback(async () => {
@@ -82,6 +82,17 @@ export const useDashboardWebSocket = () => {
     }, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!connected) return;
+
+    fetchStreams({ silent: true });
+    const id = setInterval(() => {
+      fetchStreams({ silent: true });
+    }, 3000);
+
+    return () => clearInterval(id);
+  }, [connected, fetchStreams]);
 
   return { connected, streams, loading, dataRef, connectWs, disconnectWs, refreshStreams };
 };

@@ -1,9 +1,7 @@
-import { useState, useCallback } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { DevModeProvider } from './assets/context/DevModeContext';
 import { AlertProvider } from './assets/context/AlertContext';
 import AlertOverlay from './assets/components/AlertOverlay';
-import SplashScreen from './assets/components/SplashScreen';
 
 import Navbar from './assets/components/Navbar';
 import Dashboard from './assets/views/dashboard/Dashboard';
@@ -42,26 +40,15 @@ const AppLayout = () => {
   );
 };
 
-const App = () => {
-  const [appReady, setAppReady] = useState(false);
-  const handleReady = useCallback(() => setAppReady(true), []);
-
-  return (
-    <HashRouter>
-      <DevModeProvider>
-        <AlertProvider>
-          {!appReady ? (
-            <SplashScreen onReady={handleReady} />
-          ) : (
-            <>
-              <AlertOverlay />
-              <AppLayout />
-            </>
-          )}
-        </AlertProvider>
-      </DevModeProvider>
-    </HashRouter>
-  );
-};
+const App = () => (
+  <HashRouter>
+    <DevModeProvider>
+      <AlertProvider>
+        <AlertOverlay />
+        <AppLayout />
+      </AlertProvider>
+    </DevModeProvider>
+  </HashRouter>
+);
 
 export default App;

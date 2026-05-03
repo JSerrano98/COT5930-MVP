@@ -112,10 +112,24 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
       if (!matches.length) {
         matches = byNormalizedLabel.get(normalizeFeatureKey(feature)) || [];
       }
+      if (!matches.length) {
+        const normalizedFeature = normalizeFeatureKey(feature);
+        const baseFeature = normalizedFeature.replace(/\d+$/, '');
+        if (baseFeature) {
+          const starts = [];
+          const contains = [];
+          byNormalizedLabel.forEach((channels, key) => {
+            if (key.startsWith(baseFeature)) starts.push(...channels);
+            else if (key.includes(baseFeature)) contains.push(...channels);
+          });
+          matches = starts.length ? starts : contains;
+        }
+      }
       if (matches.length === 1) {
         map[feature] = matches[0].lookup;
       }
       if (matches.length > 1) {
+        matches.sort((a, b) => a.label.length - b.label.length);
         map[feature] = matches[0].lookup;
       }
     }
