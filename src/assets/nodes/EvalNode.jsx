@@ -2,8 +2,8 @@ import { Position } from 'reactflow';
 import MLNodeBase, { LabeledHandle } from './MLNodeBase';
 
 const BAR_COLOR = (v) => {
-  if (v >= 0.9) return 'bg-emerald-500';
-  if (v >= 0.7) return 'bg-blue-500';
+  if (v >= 0.9) return 'bg-echo-green';
+  if (v >= 0.7) return 'bg-echo-blue';
   if (v >= 0.5) return 'bg-yellow-500';
   return 'bg-red-500';
 };
@@ -11,10 +11,10 @@ const BAR_COLOR = (v) => {
 const MetricBar = ({ label, value }) => (
   <div className="mb-2">
     <div className="flex justify-between text-[10px] mb-0.5">
-      <span className="text-slate-400">{label}</span>
-      <span className="text-slate-200 font-mono">{(value * 100).toFixed(1)}%</span>
+      <span className="text-echo-muted">{label}</span>
+      <span className="text-white font-body">{(value * 100).toFixed(1)}%</span>
     </div>
-    <div className="w-full bg-slate-700 h-1.5">
+    <div className="w-full bg-echo-border h-1.5">
       <div className={`h-1.5 transition-all ${BAR_COLOR(value)}`} style={{ width: `${value * 100}%` }} />
     </div>
   </div>
@@ -33,7 +33,7 @@ const EvalNode = ({ data }) => {
       }
     >
       {!r && (
-        <p className="text-[11px] text-slate-600 text-center py-4">Connect a Trainer node and run the pipeline to see results.</p>
+        <p className="text-[11px] text-echo-dim text-center py-4">Connect a Trainer node and run the pipeline to see results.</p>
       )}
 
       {r && (
@@ -45,15 +45,15 @@ const EvalNode = ({ data }) => {
           {r.auc        != null && <MetricBar label="AUC-ROC"   value={r.auc}       />}
 
           {r.confusion_matrix && (
-            <div className="mt-3 border-t border-slate-700 pt-2">
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Confusion Matrix</p>
+            <div className="mt-3 border-t border-echo-border pt-2">
+              <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-2">Confusion Matrix</p>
               <div className="overflow-x-auto">
-                <table className="text-[10px] font-mono text-slate-300">
+                <table className="text-[10px] font-mono text-echo-muted">
                   <tbody>
                     {r.confusion_matrix.map((row, i) => (
                       <tr key={i}>
                         {row.map((cell, j) => (
-                          <td key={j} className="px-2 py-0.5 text-center border border-slate-700 min-w-7">{cell}</td>
+                          <td key={j} className="px-2 py-0.5 text-center border border-echo-border min-w-7">{cell}</td>
                         ))}
                       </tr>
                     ))}
@@ -64,9 +64,9 @@ const EvalNode = ({ data }) => {
           )}
 
           {r.classification_report && (
-            <div className="mt-3 border-t border-slate-700 pt-2">
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Class Report</p>
-              <pre className="text-[9px] text-slate-400 font-mono overflow-x-auto">{r.classification_report}</pre>
+            <div className="mt-3 border-t border-echo-border pt-2">
+              <p className="text-[10px] text-echo-muted uppercase tracking-widest mb-1">Class Report</p>
+              <pre className="text-[9px] text-echo-muted font-mono overflow-x-auto">{r.classification_report}</pre>
             </div>
           )}
         </>

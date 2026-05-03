@@ -28,11 +28,9 @@ class AlphaBandPower(DerivedSensor):
     a clear error message.
     """
 
-    # Alpha band edges in Hz
     alpha_low:  float = 8.0
     alpha_high: float = 12.0
 
-    # Lock source_type to EEG — the parent class filters by this in _setup()
     source_type: str = "EEG"
 
     def __post_init__(self):
@@ -61,7 +59,6 @@ class AlphaBandPower(DerivedSensor):
     def process(self, buffer: np.ndarray) -> list[float] | None:
         n_samples, n_channels = buffer.shape
 
-        # Need at least 1 second of data for a reasonable PSD estimate
         if n_samples < self.source_rate:
             return None
 
@@ -69,15 +66,12 @@ class AlphaBandPower(DerivedSensor):
         for ch in range(n_channels):
             signal = buffer[:, ch]
 
-            # Welch PSD — nperseg capped to buffer length
             nperseg = min(int(self.source_rate), n_samples)
             freqs, psd = welch(signal, fs=self.source_rate, nperseg=nperseg)
 
-            # Integrate power in the alpha band
             alpha_mask = (freqs >= self.alpha_low) & (freqs <= self.alpha_high)
             alpha_power = np.trapz(psd[alpha_mask], freqs[alpha_mask])
 
-            # Log-scale (with floor to avoid log(0))
             results.append(float(np.log10(max(alpha_power, 1e-12))))
 
         return results
@@ -91,7 +85,7 @@ if __name__ == "__main__":
         channels=8,              # must match source EEG channel count
         sample_rate=1,           # output 1 update per second
         source_name="FakeEEG",   # must match source sensor's name exactly
-        source_type="EEG",       # enforced — source must be EEG
+        source_type="EEG",       # enforced - source must be EEG
         buffer_seconds=2.0,      # 2s window for PSD
         process_interval=1.0,    # recompute every second
     )

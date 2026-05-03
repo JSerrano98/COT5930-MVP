@@ -90,7 +90,7 @@ const ModelNode = ({ data }) => {
         {TASKS.map(t => (
           <button key={t} onClick={() => { setTask(t); data?.onConfigChange?.({ model: modelKey, task: t, params }); }}
             className={`flex-1 px-2 py-1 text-[10px] font-semibold border transition-colors ${
-              task === t ? 'bg-slate-600 border-slate-500 text-slate-100' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+              task === t ? 'bg-echo-green/20 border-echo-green text-echo-green' : 'bg-echo-surface-2 border-echo-border text-echo-muted hover:text-white'
             }`}>
             {t}
           </button>
@@ -100,12 +100,12 @@ const ModelNode = ({ data }) => {
       {/* Model list */}
       {MODELS.map(({ category, options }) => (
         <div key={category} className="mb-3">
-          <p className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">{category}</p>
+          <p className="text-[9px] text-echo-muted uppercase tracking-widest mb-1">{category}</p>
           <div className="flex flex-col gap-0.5">
             {options.map(o => (
               <button key={o.key} onClick={() => selectModel(o.key)}
                 className={`w-full text-left px-2 py-1 text-[10px] border transition-colors ${
-                  modelKey === o.key ? 'bg-slate-600 border-slate-500 text-slate-100' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                  modelKey === o.key ? 'bg-echo-green/20 border-echo-green text-echo-green' : 'bg-echo-surface-2 border-echo-border text-echo-muted hover:text-white'
                 }`}>
                 {o.label}
               </button>
@@ -116,23 +116,23 @@ const ModelNode = ({ data }) => {
 
       {/* Hyperparameters */}
       {hpDefs.length > 0 && (
-        <div className="border-t border-slate-700 pt-2 mt-2">
-          <p className="text-[9px] text-slate-500 uppercase tracking-widest mb-2">Hyperparameters</p>
+        <div className="border-t border-echo-border pt-2 mt-2">
+          <p className="text-[9px] text-echo-muted uppercase tracking-widest mb-2">Hyperparameters</p>
           <div className="grid grid-cols-2 gap-2">
             {hpDefs.map(hp => (
               <div key={hp.key}>
-                <p className="text-[10px] text-slate-500 mb-0.5">{hp.label}</p>
+                <p className="text-[10px] text-echo-muted mb-0.5">{hp.label}</p>
                 {hp.type === 'select' ? (
                   <select
                     value={params[hp.key] ?? hp.default}
                     onChange={e => updateParam(hp.key, e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-1 py-0.5 focus:outline-none focus:border-slate-500"
+                    className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-1 py-0.5 focus:outline-none focus:border-echo-green"
                   >
                     {hp.options.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 ) : (
                   <input
-                    className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-1.5 py-0.5 focus:outline-none focus:border-slate-500"
+                    className="w-full bg-echo-surface-2 border border-echo-border text-white text-xs px-1.5 py-0.5 focus:outline-none focus:border-echo-green"
                     value={params[hp.key] ?? hp.default}
                     onChange={e => updateParam(hp.key, e.target.value)}
                   />

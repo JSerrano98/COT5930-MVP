@@ -23,7 +23,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "cross-env NODE_ENV=development electron .",
-    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\""
+    "electron:dev": "concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\""
   },
   "build": {
     "appId": "com.fau.cot5930mvp",

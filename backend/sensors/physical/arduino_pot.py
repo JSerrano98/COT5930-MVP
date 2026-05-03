@@ -1,7 +1,7 @@
 """
 Arduino Potentiometer Sensor
 
-Reads analog values (0–1023) from an Arduino sketch that prints
+Reads analog values (0-1023) from an Arduino sketch that prints
 one integer per line over USB serial at 9600 baud.
 
 Arduino sketch expected:
@@ -32,13 +32,13 @@ class ArduinoPotentiometer(PhysicalSensor):
     """
     Reads a single potentiometer channel from an Arduino over USB serial.
 
-    The raw ADC value (0–1023) is optionally normalised to 0.0–1.0.
+    The raw ADC value (0-1023) is optionally normalised to 0.0-1.0.
     Set normalize=False to stream the raw integer value instead.
     """
 
     port:      str   = ""       # leave blank to auto-detect
     baud:      int   = 9600
-    normalize: bool  = True     # True → 0.0–1.0 | False → 0–1023
+    normalize: bool  = True     # True = 0.0-1.0 | False = 0-1023
 
     _serial: serial.Serial | None = field(init=False, default=None)
 
@@ -67,7 +67,6 @@ class ArduinoPotentiometer(PhysicalSensor):
 
         print(f"[{self.name}] Opening {self.port} @ {self.baud} baud…")
         self._serial = serial.Serial(self.port, self.baud, timeout=1)
-        # Flush any garbage that accumulated while the port was closed
         self._serial.reset_input_buffer()
         print(f"[{self.name}] Connected — normalize={self.normalize}")
 

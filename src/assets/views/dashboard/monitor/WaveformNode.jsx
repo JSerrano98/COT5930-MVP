@@ -11,15 +11,12 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
   const nCh = stream?.channels ?? 0;
   const labels = stream?.channel_labels ?? [];
 
-  // Set of enabled channel indices — mutated directly so draw loop reads latest without re-renders
   const enabledRef = useRef(new Set(Array.from({ length: nCh }, (_, i) => i)));
 
-  // Re-initialise enabledRef when stream/nCh changes
   useEffect(() => {
     enabledRef.current = new Set(Array.from({ length: nCh }, (_, i) => i));
   }, [nCh]);
 
-  // Dropdown state
   const [open,    setOpen]    = useState(false);
   const [enabled, setEnabled] = useState(() => new Set(Array.from({ length: nCh }, (_, i) => i)));
 
@@ -181,7 +178,7 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
         <button
           onClick={() => setOpen(o => !o)}
           onMouseDown={e => e.stopPropagation()}
-          className="text-[9px] font-mono px-1.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors leading-none"
+          className="text-[9px] font-mono px-1.5 py-0.5 bg-echo-surface-2 border border-echo-border text-echo-muted hover:text-white hover:border-echo-green transition-colors leading-none"
           title="Show/hide channels"
         >
           CH {enabled.size}/{nCh}
@@ -189,20 +186,20 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
 
         {open && (
           <div
-            className="absolute right-0 top-full mt-0.5 bg-slate-900 border border-slate-700 shadow-xl z-20 min-w-[130px] max-h-64 overflow-y-auto"
+            className="absolute right-0 top-full mt-0.5 bg-echo-surface border border-echo-border shadow-xl z-20 min-w-[130px] max-h-64 overflow-y-auto"
             onMouseDown={e => e.stopPropagation()}
           >
             {/* All / None */}
-            <div className="flex gap-1 px-2 py-1 border-b border-slate-800">
-              <button onClick={enableAll}  className="text-[9px] font-mono text-slate-400 hover:text-slate-200">All</button>
-              <span className="text-slate-700 text-[9px]">|</span>
-              <button onClick={disableAll} className="text-[9px] font-mono text-slate-400 hover:text-slate-200">None</button>
+            <div className="flex gap-1 px-2 py-1 border-b border-echo-border">
+              <button onClick={enableAll}  className="text-[9px] font-mono text-echo-muted hover:text-white">All</button>
+              <span className="text-echo-border text-[9px]">|</span>
+              <button onClick={disableAll} className="text-[9px] font-mono text-echo-muted hover:text-white">None</button>
             </div>
 
             {Array.from({ length: nCh }, (_, ch) => (
               <label
                 key={ch}
-                className="flex items-center gap-1.5 px-2 py-0.5 hover:bg-slate-800 cursor-pointer"
+                className="flex items-center gap-1.5 px-2 py-0.5 hover:bg-echo-surface-2 cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -210,7 +207,7 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
                   onChange={() => toggleCh(ch)}
                   className="accent-emerald-400 w-3 h-3"
                 />
-                <span className="text-[10px] font-mono text-slate-300">
+                <span className="text-[10px] font-mono text-echo-muted">
                   {labels[ch] ?? `CH${ch + 1}`}
                 </span>
               </label>

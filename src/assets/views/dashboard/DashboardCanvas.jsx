@@ -4,8 +4,14 @@ import 'reactflow/dist/style.css';
 import Monitor from './monitor/Monitor';
 import WaveformNode from './monitor/WaveformNode';
 import StatsNode from './monitor/StatsNode';
+import BPMNode from './monitor/BPMNode';
+import MLModelNode from './monitor/MLModelNode';
+import CSVReplayNode from './monitor/CSVReplayNode';
+import EDANode from './monitor/EDANode';
+import EMGNode from './monitor/EMGNode';
+import RespirationNode from './monitor/RespirationNode';
+import TemperatureNode from './monitor/TemperatureNode';
 
-// Each node wraps its content in Monitor to get the header + container
 const WaveformFlowNode = ({ data }) => (
   <Monitor stream={data.stream} nodeType="waveform" lineColor={data.lineColor} onColorChange={data.onColorChange} onRemove={data.onRemove} dataRef={data.dataRef}>
     <WaveformNode stream={data.stream} dataRef={data.dataRef} lineColor={data.lineColor} />
@@ -18,46 +24,117 @@ const StatsFlowNode = ({ data }) => (
   </Monitor>
 );
 
+const BPMFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="bpm" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <BPMNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const EDAFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="eda" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <EDANode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const EMGFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="emg" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <EMGNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const RespFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="resp" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <RespirationNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const TempFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="temp" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <TemperatureNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const MLFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
+  </Monitor>
+);
+
+const CSVReplayFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="csvReplay" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <CSVReplayNode
+      monitor={data.monitor}
+      dataRef={data.dataRef}
+      onPatch={data.onPatch}
+      onRecordingChange={data.onRecordingChange}
+    />
+  </Monitor>
+);
+
 const nodeTypes = {
   waveform: WaveformFlowNode,
   stats:    StatsFlowNode,
+  bpm:      BPMFlowNode,
+  eda:      EDAFlowNode,
+  emg:      EMGFlowNode,
+  resp:     RespFlowNode,
+  temp:     TempFlowNode,
+  ml:       MLFlowNode,
+  csvReplay: CSVReplayFlowNode,
 };
 
 const DEFAULT_W = 340;
 const DEFAULT_H = 220;
 
-function DashboardCanvas({ monitors = [], dataRef, onRemove, onUpdateMonitor }) {
-  const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => ({
-    id: mon.id,
-    type: mon.nodeType,
-    position: posMap[mon.id] ?? { x: 80 + (idx % 3) * (DEFAULT_W + 20), y: 80 + Math.floor(idx / 3) * (DEFAULT_H + 20) },
-    data: {
-      stream: mon.stream,
-      dataRef,
-      lineColor: mon.lineColor,
-      onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
-      onRemove: () => onRemove(mon.id),
-    },
-    style: sizeMap[mon.id] ?? { width: DEFAULT_W, height: DEFAULT_H },
-  });
+const NODE_DEFAULTS = {
+  bpm: { width: 220, height: 200 },
+  eda: { width: 320, height: 250 },
+  emg: { width: 320, height: 250 },
+  resp: { width: 320, height: 260 },
+  temp: { width: 320, height: 240 },
+  ml: { width: 360, height: 320 },
+  csvReplay: { width: 360, height: 320 },
+};
+
+function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpdateMonitor, onRecordingChange }) {
+  const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => {
+    const defaultSize = NODE_DEFAULTS[mon.nodeType]
+      ? { width: NODE_DEFAULTS[mon.nodeType].width, height: NODE_DEFAULTS[mon.nodeType].height }
+      : { width: DEFAULT_W, height: DEFAULT_H };
+    return {
+      id: mon.id,
+      type: mon.nodeType,
+      position: posMap[mon.id] ?? { x: 80 + (idx % 3) * (DEFAULT_W + 20), y: 80 + Math.floor(idx / 3) * (DEFAULT_H + 20) },
+      data: {
+        stream: mon.stream,
+        monitor: mon,
+        streams,
+        dataRef,
+        lineColor: mon.lineColor,
+        onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
+        onPatch: (patch) => onUpdateMonitor(mon.id, patch),
+        onRecordingChange,
+        onRemove: () => onRemove(mon.id),
+      },
+      style: sizeMap[mon.id] ?? defaultSize,
+    };
+  };
 
   const [nodes, setNodes, onNodesChange] = useNodesState(monitors.map((m, i) => makeNode(m, i)));
   const [edges, setEdges, onEdgesState] = useEdgesState([]);
 
-  // Sync monitors → nodes, preserving positions/sizes of existing nodes
   useEffect(() => {
     setNodes(prev => {
       const posMap = Object.fromEntries(prev.map(n => [n.id, n.position]));
       const sizeMap = Object.fromEntries(prev.map(n => [n.id, n.style]));
       return monitors.map((mon, idx) => makeNode(mon, idx, posMap, sizeMap));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monitors]);
 
   const onConnect = useCallback((params) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#c9cdd4' }}>
+    <div style={{ width: '100%', height: '100%', background: '#E8ECF0' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -77,7 +154,7 @@ function DashboardCanvas({ monitors = [], dataRef, onRemove, onUpdateMonitor }) 
         nodesConnectable={false}
         elementsSelectable
       >
-        <Background color="#1e293b" gap={16} />
+        <Background variant="dots" color="#8A9DB5" gap={24} size={1.5} />
         <Controls />
       </ReactFlow>
     </div>

@@ -32,20 +32,22 @@ import importlib
 import pkgutil
 import time
 import sys
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from sensors.sensor import DummySensor, PhysicalSensor, DerivedSensor
 import sensors.dummy   as dummy_pkg
 import sensors.derived as derived_pkg
 
-# Physical package is optional — only import if it exists and has an __init__
 try:
     import sensors.physical as physical_pkg
     _PHYSICAL_AVAILABLE = True
 except ImportError:
     _PHYSICAL_AVAILABLE = False
 
-# ─── Packages to scan in startup order ───────────────────────────────────────
-# Derived sensors are intentionally last — their sources must be running first.
 PACKAGES = [
     (dummy_pkg,   "sensors.dummy",   DummySensor),
 ]
@@ -56,7 +58,6 @@ if _PHYSICAL_AVAILABLE:
 PACKAGES.append((derived_pkg, "sensors.derived", DerivedSensor))
 
 
-# ─── Discovery ────────────────────────────────────────────────────────────────
 
 def discover_sensors() -> tuple[list, list, list]:
     """
@@ -87,7 +88,6 @@ def discover_sensors() -> tuple[list, list, list]:
                     continue
                 if obj is base_class or obj in seen_classes:
                     continue
-                # Skip abstract base classes from sensor.py itself
                 if obj in (DummySensor, PhysicalSensor, DerivedSensor):
                     continue
 
@@ -113,7 +113,6 @@ def discover_sensors() -> tuple[list, list, list]:
     return found, skipped, failed
 
 
-# ─── Entry point ──────────────────────────────────────────────────────────────
 
 def main():
     print("=" * 54)
@@ -134,7 +133,6 @@ def main():
         print("Add a default() classmethod to any sensor class to include it.")
         sys.exit(1)
 
-    # Separate derived from the rest so we can start them after a short delay
     non_derived = [s for s in sensors if not isinstance(s, DerivedSensor)]
     derived     = [s for s in sensors if     isinstance(s, DerivedSensor)]
 

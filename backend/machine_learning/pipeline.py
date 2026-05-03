@@ -16,7 +16,6 @@ from .nodes import NODE_RUNNERS
 logger = logging.getLogger(__name__)
 
 
-# ── Topological sort ──────────────────────────────────────────────────────────
 
 def _topo_sort(node_ids: list[str], edges: list[dict]) -> list[str]:
     """Kahn's algorithm — returns nodes in execution order."""
@@ -49,7 +48,6 @@ def _topo_sort(node_ids: list[str], edges: list[dict]) -> list[str]:
     return order
 
 
-# ── Pipeline execution ────────────────────────────────────────────────────────
 
 def execute(pipeline: dict) -> dict:
     """
@@ -69,9 +67,13 @@ def execute(pipeline: dict) -> dict:
     node_ids    = list(nodes_by_id.keys())
 
     order = _topo_sort(node_ids, edges_raw)
+<<<<<<< HEAD
     print(nodes_raw)
     print('this is the order', order)
     # Map: node_id → output data (DataFrame or splits dict)
+=======
+
+>>>>>>> external/0.1.4_dev
     outputs: dict[str, Any] = {}
     node_results: list[dict] = []
     trainer_result: dict = {}
@@ -83,15 +85,16 @@ def execute(pipeline: dict) -> dict:
         ntype  = node["type"]
         config = node.get("config", {})
         upstream_config |= config
+<<<<<<< HEAD
        # print(node)
+=======
+        print(node)
+>>>>>>> external/0.1.4_dev
         runner = NODE_RUNNERS.get(ntype)
         if runner is None:
             logger.warning("No runner for node type '%s' — skipping.", ntype)
             continue
 
-        # Collect ALL upstream outputs (supports multi-input nodes like Ensemble).
-        # For single-input nodes the first upstream is passed as-is.
-        # For multi-input nodes a list of upstream outputs is passed.
         all_upstreams = [
             outputs[e["source"]]
             for e in edges_raw
@@ -102,7 +105,7 @@ def execute(pipeline: dict) -> dict:
         elif len(all_upstreams) == 1:
             upstream = all_upstreams[0]
         else:
-            upstream = all_upstreams  # list — Ensemble runner handles this
+            upstream = all_upstreams  # list - Ensemble runner handles this
 
         logger.info("Executing node %s [%s]", nid, ntype)
         logger.info('this is the upstream', upstream)

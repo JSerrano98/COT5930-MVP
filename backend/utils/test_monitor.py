@@ -31,7 +31,6 @@ async def monitor():
                 ts = data.get("timestamp", 0)
                 values = data.get("data", [])
 
-                # round values for readability
                 display = [round(v, 4) for v in values]
 
                 print(f"[{ts:.4f}]  {stream:<16}  {display}")

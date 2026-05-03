@@ -26,43 +26,25 @@ import numpy as np
 from dataclasses import dataclass, field
 from sensors.sensor import DummySensor
 
-# ---------------------------------------------------------------------------
-# Full BioSemi 64-channel 10-10 montage
-# ---------------------------------------------------------------------------
 EEG_CHANNELS = [
-    # Prefrontal / frontal-polar
     "Fp1", "AF7", "AF3", "F1",  "F3",  "F5",  "F7",
-    # Frontal-central
     "FT7", "FC5", "FC3", "FC1",
-    # Central
     "C1",  "C3",  "C5",  "T7",
-    # Temporal-parietal / parietal
     "TP7", "CP5", "CP3", "CP1",
     "P1",  "P3",  "P5",  "P7",  "P9",
-    # Parietal-occipital / occipital (left)
     "PO7", "PO3", "O1",
-    # Midline bottom-up
     "Iz",  "Oz",  "POz", "Pz",  "CPz",
-    # Prefrontal / frontal-polar (right + midline)
     "Fpz", "Fp2", "AF8", "AF4", "AFz", "Fz",
-    # Frontal (right)
     "F2",  "F4",  "F6",  "F8",
-    # Frontal-central (right)
     "FT8", "FC6", "FC4", "FC2", "FCz",
-    # Central (right + midline)
     "Cz",  "C2",  "C4",  "C6",  "T8",
-    # Temporal-parietal / parietal (right)
     "TP8", "CP6", "CP4", "CP2",
     "P2",  "P4",  "P6",  "P8",  "P10",
-    # Parietal-occipital / occipital (right)
     "PO8", "PO4", "O2",
 ]
 
 assert len(EEG_CHANNELS) == 64, f"Expected 64 channels, got {len(EEG_CHANNELS)}"
 
-# ---------------------------------------------------------------------------
-# Region tags — used to assign physiology-appropriate band amplitudes
-# ---------------------------------------------------------------------------
 _FRONTAL    = {"Fp1","Fp2","Fpz","AF3","AF4","AF7","AF8","AFz",
                "F1","F2","F3","F4","F5","F6","F7","F8","Fz"}
 _TEMPORAL   = {"FT7","FT8","T7","T8","TP7","TP8"}
@@ -81,21 +63,14 @@ def _region_amps(label: str) -> dict:
     if label in _TEMPORAL:
         return dict(delta=15.0, theta=20.0, alpha=10.0, beta=5.0,  gamma=1.5)
     if label in _CENTRAL:
-        # Central channels carry the mu (motor) rhythm in the alpha band
         return dict(delta=12.0, theta=8.0,  alpha=18.0, beta=7.0,  gamma=2.5)
     if label in _PARIETAL:
         return dict(delta=10.0, theta=10.0, alpha=20.0, beta=8.0,  gamma=2.0)
     if label in _OCCIPITAL:
-        # Strongest alpha during eyes-closed rest
         return dict(delta=8.0,  theta=8.0,  alpha=45.0, beta=5.0,  gamma=1.5)
-    # Default / midline
     return dict(delta=15.0, theta=10.0, alpha=15.0, beta=6.0, gamma=2.0)
 
 
-# ---------------------------------------------------------------------------
-# Pink (1/f) noise IIR approximation coefficients
-# Voss-McCartney method: sum of white-noise octave generators
-# ---------------------------------------------------------------------------
 _PINK_STAGES = 8          # number of octave generators
 _PINK_SCALE  = 2.0        # µV scale for background pink noise
 
@@ -114,20 +89,15 @@ class _PinkNoise:
 
     def next(self) -> float:
         self._count += 1
-        # Determine which stages to update (trailing zeros of count)
         idx = int(np.log2(self._count & -self._count)) if self._count else 0
         idx = min(idx, _PINK_STAGES - 1)
         prev = self._rows[idx]
         self._rows[idx] = self.rng.standard_normal()
         self._running_sum += self._rows[idx] - prev
-        # Mix in white noise for highest-frequency component
         white = self.rng.standard_normal()
         return (self._running_sum + white) * _PINK_SCALE / _PINK_STAGES
 
 
-# ---------------------------------------------------------------------------
-# Spatial correlation weight matrix (simple distance proxy on channel index)
-# ---------------------------------------------------------------------------
 def _build_spatial_weights(n: int, sigma: float = 4.0) -> np.ndarray:
     """
     Gaussian-decaying neighbour weights for an n-channel linear index.
@@ -141,9 +111,6 @@ def _build_spatial_weights(n: int, sigma: float = 4.0) -> np.ndarray:
     return W.astype(np.float32)
 
 
-# ---------------------------------------------------------------------------
-# Main sensor class
-# ---------------------------------------------------------------------------
 @dataclass
 class FakeEEG(DummySensor):
     """
@@ -167,7 +134,6 @@ class FakeEEG(DummySensor):
     _pink:        list       = field(init=False)   # list of _PinkNoise generators
     _W:           np.ndarray = field(init=False)   # spatial weight matrix
 
-    # Representative centre frequencies for each band (Hz)
     _BAND_FREQS = dict(delta=2.0, theta=6.0, alpha=10.5, beta=20.0, gamma=40.0)
 
     @classmethod
@@ -186,18 +152,14 @@ class FakeEEG(DummySensor):
         n = len(EEG_CHANNELS)
         rng = np.random.default_rng(seed=42)
 
-        # Random phase offsets: shape (n_channels, n_bands)
         self._phases = rng.uniform(0, 2 * np.pi, size=(n, len(self._BAND_FREQS)))
 
-        # Per-channel amplitude dictionaries
         self._region_amps = [_region_amps(lbl) for lbl in EEG_CHANNELS]
 
-        # Per-channel pink noise generators
         self._pink = [
             _PinkNoise(rng=np.random.default_rng(seed=i)) for i in range(n)
         ]
 
-        # Spatial mixing matrix
         self._W = _build_spatial_weights(n, sigma=4.0)
 
     def generate_sample(self) -> list[float]:
@@ -206,7 +168,6 @@ class FakeEEG(DummySensor):
         n = len(EEG_CHANNELS)
         bands = list(self._BAND_FREQS.items())  # [(name, freq), ...]
 
-        # 1. Generate independent signal per channel
         raw = np.empty(n)
         for i in range(n):
             amps = self._region_amps[i]
@@ -215,15 +176,11 @@ class FakeEEG(DummySensor):
                 sig += amps[band_name] * np.sin(
                     2 * np.pi * freq * t + self._phases[i, b_idx]
                 )
-            # 60 Hz line noise
             sig += self.line_noise * np.sin(2 * np.pi * 60.0 * t)
-            # 1/f background
             sig += self._pink[i].next()
-            # White noise floor
             sig += float(np.random.normal(0.0, self.noise_floor))
             raw[i] = sig
 
-        # 2. Apply spatial (volume conduction) mixing
         mixed = self._W @ raw
 
         return mixed.tolist()

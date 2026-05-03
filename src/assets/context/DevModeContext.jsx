@@ -8,7 +8,6 @@ export const DevModeProvider = ({ children }) => {
   const listenerAttached = useRef(false);
 
   useEffect(() => {
-    // window.echo is injected by Electron's preload; retry once if not yet ready
     const attach = () => {
       if (listenerAttached.current || !window.echo) return false;
       listenerAttached.current = true;

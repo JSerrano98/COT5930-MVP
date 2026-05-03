@@ -1,6 +1,169 @@
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
-* {
+/* ECHO Design Tokens */
+/* ========================= */
+@theme {
+  --color-echo-bg:        #E8ECF0;   /* light grey - canvas / workspace */
+  --color-echo-surface:   #243040;   /* gunmetal + blue - panels         */
+  --color-echo-surface-2: #1A2535;   /* deeper gunmetal - nested panels  */
+  --color-echo-base:      #111820;   /* near-black base                  */
+  --color-echo-border:    #2E4057;   /* panel border                     */
+  --color-echo-border-2:  #1B2D40;   /* subtle divider                   */
+  --color-echo-green:     #FF7A00;   /* neon orange - primary accent     */
+  --color-echo-blue:      #00D4FF;   /* neon blue accent                 */
+  --color-echo-orange:    #FF7A00;   /* neon orange accent (alias)       */
+  --color-echo-text:      #FFFFFF;   /* primary text                     */
+  --color-echo-muted:     #7A8FA6;   /* secondary text                   */
+  --color-echo-dim:       #4A5D70;   /* tertiary / placeholder text      */
+}
+
+/* Global reset - SHARP CORNERS */
+/* ========================= */
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-sizing: border-box;
+}
+/* Escape hatch for true circles (status dots, spinners) */
+.echo-circle { border-radius: 50% !important; }
+
+/* Typography */
+/* ========================= */
+body {
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #FFFFFF;
+  background-color: #111820;
+}
+
+h1, h2, h3, h4, h5, h6,
+.font-title {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+}
+
+button, label,
+.font-ui {
   font-family: 'Lexend', sans-serif;
 }
+
+input, select, textarea,
+.font-body {
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+/* Scrollbars */
+/* ========================= */
+::-webkit-scrollbar          { width: 4px; height: 4px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: #2E4057; }
+::-webkit-scrollbar-thumb:hover { background: #FF7A00; }
+
+/* ReactFlow global overrides */
+/* ========================= */
+.react-flow__controls button {
+  background: #1A2535 !important;
+  border: 1px solid #2E4057 !important;
+  color: #7A8FA6 !important;
+}
+.react-flow__controls button svg {
+  fill: #7A8FA6 !important;
+  stroke: #7A8FA6 !important;
+}
+.react-flow__controls button:hover {
+  background: #243040 !important;
+  color: #ffffff !important;
+}
+.react-flow__controls button:hover svg {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+.react-flow__minimap {
+  background: #111820 !important;
+  border: 1px solid #2E4057 !important;
+}
+.react-flow__attribution { display: none !important; }
+
+/* Form element reset */
+/* ========================= */
+input, select, textarea {
+  background-color: #1A2535;
+  color: #FFFFFF;
+  border: 1px solid #2E4057;
+  padding: 0.375rem 0.625rem;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #FF7A00;
+}
+input::placeholder, textarea::placeholder {
+  color: #4A5D70;
+}
+select option {
+  background-color: #1A2535;
+  color: #FFFFFF;
+}
+
+/* Table styling */
+/* ========================= */
+table { border-collapse: collapse; width: 100%; }
+th    { font-family: 'Lexend', sans-serif; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: #7A8FA6; background: #1A2535; }
+td    { font-family: 'Roboto', Arial, sans-serif; font-size: 0.75rem; color: #FFFFFF; }
+
+/* Utility helpers */
+/* ========================= */
+.echo-btn {
+  font-family: 'Lexend', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid #2E4057;
+  background: transparent;
+  color: #7A8FA6;
+  padding: 0.375rem 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.echo-btn:hover { border-color: #7A8FA6; color: #FFFFFF; }
+.echo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.echo-btn-green {
+  border-color: #FF7A00;
+  color: #FF7A00;
+}
+.echo-btn-green:hover { background: rgba(255,122,0,0.08); }
+
+.echo-btn-blue {
+  border-color: #00D4FF;
+  color: #00D4FF;
+}
+.echo-btn-blue:hover { background: rgba(0,212,255,0.08); }
+
+.echo-btn-orange {
+  border-color: #FF6B00;
+  color: #FF6B00;
+}
+.echo-btn-orange:hover { background: rgba(255,107,0,0.08); }
+
+.echo-btn-danger {
+  border-color: rgba(239,68,68,0.6);
+  color: #f87171;
+  background: rgba(239,68,68,0.08);
+}
+.echo-btn-danger:hover { background: rgba(239,68,68,0.15); }
+
+.echo-badge {
+  font-family: 'Lexend', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+}
+
+/* Keyframe animations */
+/* ========================= */
+@keyframes echo-pulse     { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@keyframes echo-spin      { to { transform: rotate(360deg); } }
+@keyframes echo-fade-in   { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@keyframes echo-slide-in  { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:translateX(0); } }

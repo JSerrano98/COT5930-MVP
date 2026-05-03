@@ -26,7 +26,6 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
     disconnectWs();
   }, [disconnectWs]);
 
-  // Set up Electron IPC listeners once on mount
   useEffect(() => {
     if (!window.echo) return;
 
@@ -42,7 +41,7 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
         connectWs();
       }
     });
-  }, [connectWs, disconnectWs]);
+  }, []);
 
   return { sessionRunning, sessionStarting, startSession, stopSession };
 };

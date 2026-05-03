@@ -7,7 +7,6 @@ import pandas as pd
 from scipy.stats import skew, kurtosis
 
 
-# ── Individual feature functions ──────────────────────────────────────────────
 
 def _zero_crossings(x: np.ndarray) -> float:
     return float(np.sum(np.diff(np.sign(x)) != 0))
@@ -51,7 +50,6 @@ FEATURE_FNS = {
     "band_power_alpha": lambda x, fs: _band_power(x, *BANDS["alpha"], fs),
     "band_power_beta":  lambda x, fs: _band_power(x, *BANDS["beta"],  fs),
     "band_power_gamma": lambda x, fs: _band_power(x, *BANDS["gamma"], fs),
-    # Nonlinear (lightweight approximations)
     "hjorth_mobility":    lambda x, fs: float(np.std(np.diff(x)) / (np.std(x) + 1e-12)),
     "hjorth_complexity":  lambda x, fs: float((np.std(np.diff(np.diff(x))) / (np.std(np.diff(x)) + 1e-12)) / (np.std(np.diff(x)) / (np.std(x) + 1e-12) + 1e-12)),
     "sample_entropy":     lambda x, fs: _approx_entropy(x),
@@ -72,7 +70,6 @@ def _approx_entropy(x: np.ndarray, m: int = 2, r_frac: float = 0.2) -> float:
     return float(abs(phi(m) - phi(m + 1)))
 
 
-# ── Windowing ─────────────────────────────────────────────────────────────────
 
 def extract_windows(df: pd.DataFrame, label_col: str | None, window: int, step: int,
                     feature_names: list[str], fs: float) -> pd.DataFrame:
@@ -89,14 +86,12 @@ def extract_windows(df: pd.DataFrame, label_col: str | None, window: int, step: 
                 if fn in FEATURE_FNS:
                     row[f"{col}__{fn}"] = FEATURE_FNS[fn](sig, fs)
         if label_col and label_col in df.columns:
-            # Majority vote for the label in this window
             row[label_col] = chunk[label_col].mode().iloc[0]
         rows.append(row)
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
-# ── Node entry-point ──────────────────────────────────────────────────────────
 
 def run(config: dict, upstream):
     if upstream is None:
@@ -108,7 +103,6 @@ def run(config: dict, upstream):
     fs          = float(config.get("fs",       256))
     label_col   = config.get("label", None)
 
-    # Find label column heuristically if not specified
 
     if not label_col:
         for c in upstream.columns:
