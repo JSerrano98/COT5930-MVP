@@ -366,8 +366,14 @@ def stop_csv_replay(uid: str):
 
 @app.post("/ml-sensors/start")
 def start_ml_sensor(req: MLSensorStartRequest):
-    if req.uid in _ml_sensors:
-        return {"ok": True, "uid": req.uid, "note": "already running"}
+    restarted = False
+    existing = _ml_sensors.pop(req.uid, None)
+    if existing is not None:
+        try:
+            existing.stop()
+        except Exception as exc:
+            logging.warning(f"Failed to stop existing ML sensor '{req.uid}' before restart: {exc}")
+        restarted = True
 
     source_names = [s.strip() for s in req.source_names if str(s).strip()]
     if req.source_name.strip() and req.source_name.strip() not in source_names:
@@ -405,8 +411,16 @@ def start_ml_sensor(req: MLSensorStartRequest):
         "ok": True,
         "uid": req.uid,
         "name": req.name,
+        "restarted": restarted,
         "source_names": source_names,
         "feature_aliases": req.feature_aliases,
+        "stream": {
+            "name": req.name,
+            "type": "ML",
+            "channels": int(sensor.channels),
+            "rate": float(sensor.sample_rate),
+            "channel_labels": list(getattr(sensor, "channel_labels", [])),
+        },
     }
 
 

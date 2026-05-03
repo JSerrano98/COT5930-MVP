@@ -17,6 +17,8 @@ const objectsEqual = (a = {}, b = {}) => {
   return aKeys.every((k) => a[k] === b[k]);
 };
 
+const normalizeFeatureKey = (value = '') => String(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -92,14 +94,24 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     if (!modelMeta?.feature_cols?.length) return {};
 
     const byLabel = new Map();
+    const byNormalizedLabel = new Map();
     availableChannels.forEach((ch) => {
       if (!byLabel.has(ch.label)) byLabel.set(ch.label, []);
       byLabel.get(ch.label).push(ch);
+
+      const normalized = normalizeFeatureKey(ch.label);
+      if (normalized) {
+        if (!byNormalizedLabel.has(normalized)) byNormalizedLabel.set(normalized, []);
+        byNormalizedLabel.get(normalized).push(ch);
+      }
     });
 
     const map = {};
     for (const feature of modelMeta.feature_cols) {
-      const matches = byLabel.get(feature) || [];
+      let matches = byLabel.get(feature) || [];
+      if (!matches.length) {
+        matches = byNormalizedLabel.get(normalizeFeatureKey(feature)) || [];
+      }
       if (matches.length === 1) {
         map[feature] = matches[0].lookup;
       }

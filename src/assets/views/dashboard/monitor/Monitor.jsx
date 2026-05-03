@@ -28,34 +28,35 @@ const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef
     return () => clearInterval(id);
   }, [dataRef, stream]);
 
+  const isLowRateStream = expectedIntervalMs != null && expectedIntervalMs >= 250;
+  const goodThresholdMs = isLowRateStream
+    ? Math.max(300, expectedIntervalMs * 2.5)
+    : 350;
+  const fairThresholdMs = isLowRateStream
+    ? Math.max(800, expectedIntervalMs * 5)
+    : 1000;
+
+  const latencyState =
+    latencyMs === null
+      ? 'none'
+      : latencyMs <= goodThresholdMs
+        ? 'good'
+        : latencyMs <= fairThresholdMs
+          ? 'fair'
+          : 'poor';
+
   const latencyColor =
-    latencyMs === null ? '#475569' :
-    expectedIntervalMs
-      ? latencyMs < expectedIntervalMs * 1.5
-        ? '#22c55e'
-        : latencyMs < expectedIntervalMs * 3
-          ? '#eab308'
-          : '#ef4444'
-      : latencyMs < 100
-        ? '#22c55e'
-        : latencyMs < 300
-          ? '#eab308'
+    latencyState === 'none' ? '#475569'
+      : latencyState === 'good' ? '#22c55e'
+        : latencyState === 'fair' ? '#eab308'
           : '#ef4444';
 
   const latencyLabel =
     latencyMs === null
       ? 'No data'
       : expectedIntervalMs
-        ? latencyMs < expectedIntervalMs * 1.5
-          ? `Good (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
-          : latencyMs < expectedIntervalMs * 3
-            ? `Fair (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
-            : `Poor (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
-        : latencyMs < 100
-          ? `Good (${latencyMs} ms)`
-          : latencyMs < 300
-            ? `Fair (${latencyMs} ms)`
-            : `Poor (${latencyMs} ms)`;
+        ? `${latencyState === 'good' ? 'Good' : latencyState === 'fair' ? 'Fair' : 'Poor'} (${latencyMs} ms, ${(latencyMs / expectedIntervalMs).toFixed(2)}x period)`
+        : `${latencyState === 'good' ? 'Good' : latencyState === 'fair' ? 'Fair' : 'Poor'} (${latencyMs} ms)`;
 
   return (
   <div className="flex flex-col bg-echo-surface border border-echo-border overflow-hidden w-full h-full">

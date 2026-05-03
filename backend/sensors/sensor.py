@@ -17,6 +17,7 @@ import time
 import threading
 import pickle
 import os
+import re
 import numpy as np
 import pandas as pd
 from pylsl import StreamInfo, StreamOutlet, StreamInlet, resolve_byprop
@@ -387,6 +388,8 @@ class MLSensor(DerivedSensor):
     _multi_source_mode: bool = field(init=False, default=False)
     _inlets_meta: list[dict] = field(init=False, default_factory=list)
     _latest_by_source: dict[str, np.ndarray | None] = field(init=False, default_factory=dict)
+    _updated_since_predict: dict[str, bool] = field(init=False, default_factory=dict)
+    _next_predict_at: float = field(init=False, default=0.0)
 
     def __post_init__(self):
         if not self.model_path:
@@ -460,6 +463,8 @@ class MLSensor(DerivedSensor):
         self._multi_source_mode = True
         self._inlets_meta = []
         self._latest_by_source = {}
+        self._updated_since_predict = {}
+        self._next_predict_at = time.monotonic()
 
         print(f"[{self.name}] Resolving source streams: {', '.join(requested)}")
 
@@ -489,6 +494,7 @@ class MLSensor(DerivedSensor):
                 "rate": float(info.nominal_srate()),
             })
             self._latest_by_source[source] = None
+            self._updated_since_predict[source] = False
             max_rate = max(max_rate, float(info.nominal_srate()))
 
             print(
@@ -525,28 +531,64 @@ class MLSensor(DerivedSensor):
                 self._last_prediction_error = msg
             return None
 
+    @staticmethod
+    def _normalize_feature_key(key: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", str(key).strip().lower())
+
     def _assemble_features(self, values: np.ndarray, label_to_value: dict[str, float]) -> np.ndarray | None:
         n_features = len(self._feature_cols) if self._feature_cols else int(values.size)
         if n_features <= 0:
             return None
 
         if self._feature_cols:
+            normalized_lookup: dict[str, float] = {}
+            for key, value in label_to_value.items():
+                norm = self._normalize_feature_key(key)
+                if norm and norm not in normalized_lookup:
+                    normalized_lookup[norm] = float(value)
+
             assembled = []
             missing = []
             for feature in self._feature_cols:
-                lookup = self.feature_aliases.get(feature, feature)
-                if lookup in label_to_value:
-                    assembled.append(label_to_value[lookup])
-                else:
+                candidates = []
+                alias = self.feature_aliases.get(feature)
+                if alias:
+                    candidates.append(alias)
+                candidates.append(feature)
+
+                matched_value = None
+                for candidate in candidates:
+                    if candidate in label_to_value:
+                        matched_value = label_to_value[candidate]
+                        break
+
+                    norm_candidate = self._normalize_feature_key(candidate)
+                    if norm_candidate in normalized_lookup:
+                        matched_value = normalized_lookup[norm_candidate]
+                        break
+
+                    if "::" in candidate:
+                        tail = candidate.split("::", 1)[1]
+                        norm_tail = self._normalize_feature_key(tail)
+                        if norm_tail in normalized_lookup:
+                            matched_value = normalized_lookup[norm_tail]
+                            break
+
+                if matched_value is None:
                     missing.append(feature)
+                else:
+                    assembled.append(float(matched_value))
 
             if not missing:
                 return np.asarray(assembled, dtype=float)
 
             if not self._warned_feature_mapping:
+                sample_missing = ", ".join(str(m) for m in missing[:5])
+                sample_keys = ", ".join(str(k) for k in list(label_to_value.keys())[:10])
                 print(
                     f"[{self.name}] Feature labels not fully matched ({len(missing)} missing). "
-                    f"Using ordered fallback."
+                    f"Using ordered fallback. Missing sample: [{sample_missing}] | "
+                    f"available keys sample: [{sample_keys}]"
                 )
                 self._warned_feature_mapping = True
 
@@ -559,20 +601,29 @@ class MLSensor(DerivedSensor):
         if not self._multi_source_mode:
             return super()._loop_body()
 
-        saw_new = False
         for meta in self._inlets_meta:
             samples, _ = meta["inlet"].pull_chunk(timeout=0.0)
             if samples:
-                self._latest_by_source[meta["name"]] = np.asarray(samples[-1], dtype=float)
-                saw_new = True
-
-        if not saw_new:
-            time.sleep(self.process_interval)
-            return
+                source_name = meta["name"]
+                self._latest_by_source[source_name] = np.asarray(samples[-1], dtype=float)
+                self._updated_since_predict[source_name] = True
 
         latest = []
-        labels = []
         label_to_value: dict[str, float] = {}
+
+        # Wait until every selected source has produced at least one sample.
+        for meta in self._inlets_meta:
+            sample = self._latest_by_source.get(meta["name"])
+            if sample is None:
+                time.sleep(min(0.05, self.process_interval))
+                return
+
+        # Predict at the ML loop cadence using latest values; do not lock to the
+        # slowest source update cadence.
+        now = time.monotonic()
+        if now < self._next_predict_at:
+            time.sleep(min(0.05, max(0.0, self._next_predict_at - now)))
+            return
 
         for meta in self._inlets_meta:
             sample = self._latest_by_source.get(meta["name"])
@@ -585,7 +636,6 @@ class MLSensor(DerivedSensor):
 
             for idx, value in enumerate(sample.tolist()):
                 label = meta["labels"][idx] if idx < len(meta["labels"]) else f"{meta['name']}_ch{idx+1}"
-                labels.append(label)
                 if label not in label_to_value:
                     label_to_value[label] = float(value)
                 prefixed = f"{meta['name']}::{label}"
@@ -594,11 +644,16 @@ class MLSensor(DerivedSensor):
 
         features = self._assemble_features(np.asarray(latest, dtype=float), label_to_value)
         if features is None:
+            self._next_predict_at = time.monotonic() + self.process_interval
             return
 
         result = self._predict_from_features(features)
         if result is not None:
             self.push(result)
+        self._next_predict_at = time.monotonic() + self.process_interval
+
+        for source_name in self._updated_since_predict:
+            self._updated_since_predict[source_name] = False
 
     def process(self, buffer: np.ndarray) -> list[float] | None:
         if buffer is None or len(buffer) == 0:
@@ -651,6 +706,7 @@ class MLSensor(DerivedSensor):
                     pass
             self._inlets_meta = []
             self._latest_by_source = {}
+            self._updated_since_predict = {}
             return
         super()._teardown()
 
