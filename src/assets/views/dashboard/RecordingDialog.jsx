@@ -11,7 +11,14 @@ const fmt = (d) => {
 const getRecordingsDir = () =>
   localStorage.getItem('echo_recordings_dir') || 'backend/recordings';
 
-const RecordingDialog = ({ onConfirm, onCancel, isElectron }) => {
+const RecordingDialog = ({
+  onConfirm,
+  onCancel,
+  isElectron,
+  title = 'NEW RECORDING',
+  confirmLabel = 'Start Recording',
+  startRecordingOnConfirm = true,
+}) => {
   const [fileName, setFileName] = useState(`recording_${fmt(new Date())}`);
   const [format,   setFormat]   = useState('csv');
   const [loading,  setLoading]  = useState(false);
@@ -26,14 +33,16 @@ const RecordingDialog = ({ onConfirm, onCancel, isElectron }) => {
     const folder = getRecordingsDir();
     const filePath = `${folder}/${name}${ext}`;
 
-    if (isElectron && window.echo?.startRecording) {
-      await window.echo.startRecording({ filePath, format });
-    } else {
-      await fetch(`${API_URL}/record/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: filePath, format }),
-      }).catch(() => {});
+    if (startRecordingOnConfirm) {
+      if (isElectron && window.echo?.startRecording) {
+        await window.echo.startRecording({ filePath, format });
+      } else {
+        await fetch(`${API_URL}/record/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_path: filePath, format }),
+        }).catch(() => {});
+      }
     }
 
     setLoading(false);
@@ -49,7 +58,7 @@ const RecordingDialog = ({ onConfirm, onCancel, isElectron }) => {
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-echo-border bg-echo-surface-2">
-          <span className="font-title text-xl tracking-[0.1em] text-white">NEW RECORDING</span>
+          <span className="font-title text-xl tracking-[0.1em] text-white">{title}</span>
           <button
             onClick={onCancel}
             className="text-echo-dim hover:text-white transition-colors text-lg leading-none font-ui"
@@ -97,12 +106,6 @@ const RecordingDialog = ({ onConfirm, onCancel, isElectron }) => {
                 : 'XDF — standard LSL archival format, loadable with EEGLAB / MNE / pyxdf'}
             </span>
           </label>
-
-          {/* Save path preview */}
-          <div className="bg-echo-surface-2 border border-echo-border px-3 py-2 text-[10px] font-body text-echo-dim truncate">
-            → {getRecordingsDir()}/{fileName.trim() || 'recording'}
-            {format === 'xlsx' ? '.xlsx' : format === 'xdf' ? '.xdf' : '.csv'}
-          </div>
         </div>
 
         {/* Footer */}
@@ -120,7 +123,7 @@ const RecordingDialog = ({ onConfirm, onCancel, isElectron }) => {
           >
             <span className="flex items-center justify-center gap-2">
               <span className="echo-circle w-2 h-2 bg-red-400 inline-block" />
-              {loading ? 'Starting…' : 'Start Recording'}
+              {loading ? 'Starting…' : confirmLabel}
             </span>
           </button>
         </div>

@@ -24,10 +24,12 @@ const AppLayout = () => {
           <Dashboard />
         </div>
 
-        {/* ML is always mounted — visibility toggled so pipeline state persists */}
-        <div style={{ display: isML ? 'flex' : 'none', width: '100%', height: '100%' }}>
-          <MachineLearning />
-        </div>
+        {/* ML mounts only on its route so startup doesn't block the dashboard render. */}
+        {isML && (
+          <div style={{ display: isML ? 'flex' : 'none', width: '100%', height: '100%' }}>
+            <MachineLearning />
+          </div>
+        )}
 
         {/* Other routes render normally */}
         {!isDashboard && !isML && (

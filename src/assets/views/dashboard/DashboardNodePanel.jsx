@@ -1,7 +1,13 @@
+import { useDevMode } from '../../context/DevModeContext';
+
 const NODE_TYPES = [
   { key: 'waveform', label: 'Waveform', excludeType: 'HeartRate' },
-  { key: 'stats',    label: 'Stats' },
-  { key: 'bpm',      label: 'BPM', onlyType: 'HeartRate' },
+  { key: 'stats', label: 'Stats' },
+  { key: 'bpm', label: 'BPM', onlyType: 'HeartRate' },
+  { key: 'eda', label: 'EDA', onlyType: 'EDA' },
+  { key: 'emg', label: 'EMG', onlyType: 'EMG' },
+  { key: 'resp', label: 'Resp', onlyType: 'Respiration' },
+  { key: 'temp', label: 'Temp', onlyType: 'Temperature' },
 ];
 
 const groupByType = (streams) =>
@@ -11,7 +17,8 @@ const groupByType = (streams) =>
     return acc;
   }, {});
 
-const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, onRemove, sessionRunning, collapsed = false, onToggle, connected = false, loading = false, recording = false, onRecordClick, onRefresh }) => {
+const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, onAddCsvReplay, onRemove, sessionRunning, collapsed = false, onToggle, connected = false, loading = false, recording = false, onRecordClick, onRefresh }) => {
+  const { devMode } = useDevMode();
   const groups = groupByType(streams);
 
   const countByStream = monitors.reduce((acc, m) => {
@@ -67,6 +74,15 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, on
               >
                 + ML
               </button>
+              {devMode && (
+                <button
+                  onClick={onAddCsvReplay}
+                  title="Add CSV replay monitor"
+                  className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-ui font-semibold tracking-widest uppercase border border-echo-border text-echo-dim hover:border-echo-muted hover:text-white transition-colors"
+                >
+                  + CSV Replay
+                </button>
+              )}
             </div>
           )}
           <button
@@ -113,7 +129,7 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, on
                         )}
                       </div>
                       <div className="flex gap-px">
-                        {NODE_TYPES.filter(nt => (!nt.onlyType || nt.onlyType === stream.type) && (!nt.excludeType || nt.excludeType !== stream.type)).map((nt) => (
+                        {NODE_TYPES.filter((nt) => (!nt.onlyType || nt.onlyType === stream.type) && (!nt.excludeType || nt.excludeType !== stream.type)).map((nt) => (
                           <button
                             key={nt.key}
                             onClick={() => onAdd(stream, nt.key)}

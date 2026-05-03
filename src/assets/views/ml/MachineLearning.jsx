@@ -155,17 +155,6 @@ const MLTrainForm = ({ intake, onBack }) => {
         >
           Back
         </button>
-        <div>
-          <h1 className="font-title text-3xl tracking-[0.1em] text-white">MODEL WORKBENCH</h1>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="text-[10px] text-echo-dim font-body max-w-[240px] truncate" title={intake.datasetPath}>
-              {intake.datasetPath.split(/[\/\\]/).pop()}
-            </span>
-            <span className={`border px-2 py-0.5 text-[9px] font-ui font-semibold tracking-widest uppercase ${taskColor}`}>
-              {taskLabel}
-            </span>
-          </div>
-        </div>
       </div>
 
       <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-3">
@@ -192,12 +181,6 @@ const MLTrainForm = ({ intake, onBack }) => {
                   Load columns
                 </button>
               )}
-            </div>
-
-            <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body md:col-span-2">
-              <p className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Save Destination</p>
-              <p className="mt-2 break-all text-white">{saveDir}/{saveFile}</p>
-              <p className="mt-1 text-[10px] text-echo-dim">Training automatically writes the model file here.</p>
             </div>
 
             <label className="flex flex-col gap-1 md:col-span-2">

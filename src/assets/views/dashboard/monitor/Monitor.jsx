@@ -3,7 +3,12 @@ import { NodeResizeControl } from 'reactflow';
 
 const NODE_TYPE_LABELS = {
   waveform: 'WAVEFORM',
-  stats:    'STATS',
+  stats: 'STATS',
+  eda: 'EDA',
+  emg: 'EMG',
+  resp: 'RESP',
+  temp: 'TEMP',
+  csvReplay: 'CSV REPLAY',
 };
 
 const Monitor = ({ stream, nodeType, lineColor, onColorChange, onRemove, dataRef, children }) => {

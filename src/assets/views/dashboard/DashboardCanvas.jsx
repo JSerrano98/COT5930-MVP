@@ -6,6 +6,11 @@ import WaveformNode from './monitor/WaveformNode';
 import StatsNode from './monitor/StatsNode';
 import BPMNode from './monitor/BPMNode';
 import MLModelNode from './monitor/MLModelNode';
+import CSVReplayNode from './monitor/CSVReplayNode';
+import EDANode from './monitor/EDANode';
+import EMGNode from './monitor/EMGNode';
+import RespirationNode from './monitor/RespirationNode';
+import TemperatureNode from './monitor/TemperatureNode';
 
 // Each node wraps its content in Monitor to get the header + container
 const WaveformFlowNode = ({ data }) => (
@@ -26,9 +31,44 @@ const BPMFlowNode = ({ data }) => (
   </Monitor>
 );
 
+const EDAFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="eda" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <EDANode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const EMGFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="emg" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <EMGNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const RespFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="resp" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <RespirationNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
+const TempFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="temp" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <TemperatureNode stream={data.stream} dataRef={data.dataRef} />
+  </Monitor>
+);
+
 const MLFlowNode = ({ data }) => (
   <Monitor stream={data.stream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
     <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
+  </Monitor>
+);
+
+const CSVReplayFlowNode = ({ data }) => (
+  <Monitor stream={data.stream} nodeType="csvReplay" onRemove={data.onRemove} dataRef={data.dataRef}>
+    <CSVReplayNode
+      monitor={data.monitor}
+      dataRef={data.dataRef}
+      onPatch={data.onPatch}
+      onRecordingChange={data.onRecordingChange}
+    />
   </Monitor>
 );
 
@@ -36,7 +76,12 @@ const nodeTypes = {
   waveform: WaveformFlowNode,
   stats:    StatsFlowNode,
   bpm:      BPMFlowNode,
+  eda:      EDAFlowNode,
+  emg:      EMGFlowNode,
+  resp:     RespFlowNode,
+  temp:     TempFlowNode,
   ml:       MLFlowNode,
+  csvReplay: CSVReplayFlowNode,
 };
 
 const DEFAULT_W = 340;
@@ -44,10 +89,15 @@ const DEFAULT_H = 220;
 
 const NODE_DEFAULTS = {
   bpm: { width: 220, height: 200 },
-  ml: { width: 320, height: 260 },
+  eda: { width: 320, height: 250 },
+  emg: { width: 320, height: 250 },
+  resp: { width: 320, height: 260 },
+  temp: { width: 320, height: 240 },
+  ml: { width: 360, height: 320 },
+  csvReplay: { width: 360, height: 320 },
 };
 
-function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpdateMonitor }) {
+function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpdateMonitor, onRecordingChange }) {
   const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => {
     const defaultSize = NODE_DEFAULTS[mon.nodeType]
       ? { width: NODE_DEFAULTS[mon.nodeType].width, height: NODE_DEFAULTS[mon.nodeType].height }
@@ -64,6 +114,7 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
         lineColor: mon.lineColor,
         onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
         onPatch: (patch) => onUpdateMonitor(mon.id, patch),
+        onRecordingChange,
         onRemove: () => onRemove(mon.id),
       },
       style: sizeMap[mon.id] ?? defaultSize,

@@ -68,8 +68,8 @@ const Dashboard = () => {
     prevRecording.current  = recording;
   }, [connected, sessionRunning, recording, pushAlert]);
 
-  const handleSetRecording = (val) => {
-    if (!val) userStoppedRecording.current = true;
+  const handleSetRecording = (val, { intentional = false } = {}) => {
+    if (!val && intentional) userStoppedRecording.current = true;
     setRecording(val);
   };
 
@@ -88,7 +88,7 @@ const Dashboard = () => {
           .catch(() => ({}));
         savedTo = result?.saved_to ?? '';
       }
-      setRecording(false);
+      handleSetRecording(false, { intentional: true });
       pushAlert({
         type: 'success',
         title: 'Recording Saved',
@@ -101,7 +101,7 @@ const Dashboard = () => {
 
   const handleRecordConfirm = () => {
     setShowRecordDialog(false);
-    setRecording(true);
+    handleSetRecording(true);
   };
 
   const handleRecordCancel = () => {
@@ -128,11 +128,30 @@ const Dashboard = () => {
         nodeType: 'ml',
         stream: null,
         sensorUid: '',
-        sensorName: `ML_${Date.now().toString().slice(-5)}`,
+        sensorName: '',
         sourceName: '',
+        sourceNames: [],
         sourceType: '',
         modelPath: '',
+        featureAliases: {},
         running: false,
+      },
+    ]);
+
+  const addCsvReplayMonitor = () =>
+    setMonitors((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        nodeType: 'csvReplay',
+        stream: null,
+        replayUid: '',
+        sensorName: '',
+        csvPath: '',
+        timestampColumn: 'timestamp',
+        running: false,
+        completed: false,
+        savedTo: '',
       },
     ]);
 
@@ -140,6 +159,12 @@ const Dashboard = () => {
     const mon = monitors.find((m) => m.id === id);
     if (mon?.nodeType === 'ml' && mon.sensorUid) {
       fetch(`http://localhost:8000/ml-sensors/${mon.sensorUid}`, { method: 'DELETE' }).catch(() => {});
+    }
+    if (mon?.nodeType === 'csvReplay' && mon.replayUid) {
+      fetch(`http://localhost:8000/csv-replays/${mon.replayUid}`, { method: 'DELETE' }).catch(() => {});
+      if (mon.running) {
+        handleSetRecording(false, { intentional: true });
+      }
     }
     setMonitors((prev) => prev.filter((m) => m.id !== id));
   };
@@ -162,6 +187,7 @@ const Dashboard = () => {
           streams={streams}
           onAdd={addMonitor}
           onAddModel={addModelMonitor}
+          onAddCsvReplay={addCsvReplayMonitor}
           onRemove={removeMonitor}
           sessionRunning={sessionRunning}
           collapsed={panelCollapsed}
@@ -179,6 +205,7 @@ const Dashboard = () => {
           dataRef={dataRef}
           onRemove={removeMonitor}
           onUpdateMonitor={updateMonitor}
+          onRecordingChange={handleSetRecording}
         />
       </div>
 
