@@ -1,26 +1,49 @@
-# Physical Sensor Implementation Guide
+# Adding Physical Sensors to ECHO
 
-This covers wrapping a non-LSL hardware device into an Echo sensor. You'll need to know how the device communicates (serial, BLE, TCP, SDK) and what its data format looks like.
+This guide explains the shared pattern for connecting a real hardware device that does not natively support Lab Streaming Layer (LSL) to ECHO. After following this process, the device will appear on the dashboard and its data can be recorded alongside the rest of your streams.
+
+If you already know your device type, use one of these focused guides first:
+
+- [ADDING NON LSL USB DEVICES.md](ADDING%20NON%20LSL%20USB%20DEVICES.md)
+- [ADDING NON LSL BLUETOOTH DEVICES.md](ADDING%20NON%20LSL%20BLUETOOTH%20DEVICES.md)
+
+Examples of devices you might connect: heart rate monitors via USB serial, EDA sensors via Bluetooth, custom Arduino boards, and any device that sends data over a network or cable.
+
+> **Device already supports LSL?** Open the manufacturer's LSL app, start streaming, then click **Refresh** in the ECHO dashboard. No code needed.
 
 ---
 
-## Overview
+## What You Need to Know About the Device
 
-`PhysicalSensor` subclasses `Sensor` and provides three hooks:
+Before writing any code, gather this information from the device's datasheet or manual:
 
-- `connect()` — open the connection to the device (called once at startup)
-- `read_sample()` — read one sample from the device (called in a loop)
-- `disconnect()` — close the connection (called on stop, optional)
+| Question | Where it ends up in your code |
+|----------|-------------------------------|
+| How does it connect? (USB serial, Bluetooth, TCP network, SDK) | `connect()` method |
+| What format does it send data in? (CSV text, raw binary, SDK function) | `read_sample()` method |
+| How many numbers does it send per reading? | `channels` parameter |
+| How many readings per second? | `sample_rate` parameter |
 
-The base class handles threading, LSL outlet creation, and timing.
+---
+
+## How It Works
+
+You create a Python class for your device that fills in three methods. The base class (`PhysicalSensor`) handles everything else — threading, timing, LSL stream creation, and integration with the dashboard.
+
+The three methods you fill in:
+
+- **`connect()`** — Opens the connection to the device. Called once when the sensor starts.
+- **`read_sample()`** — Reads one measurement from the device. Called repeatedly in a loop. Return a list of numbers (one per channel), or `None` if there is nothing to read yet.
+- **`disconnect()`** — Closes the connection. Called when the sensor stops. This is optional but recommended for clean shutdown.
 
 ---
 
 ## Setup
 
-1. Copy `physical_sensor_template.py` into `sensors/physical/`
-2. Rename the file and class to match your device
-3. Implement `connect()` and `read_sample()` based on the device's protocol
+1. Copy `backend/sensors/templates/physical_sensor_template.py` into `backend/sensors/physical/`
+2. Rename the file to match your device (e.g., `my_heart_monitor.py`)
+3. Rename the class inside the file to match (e.g., `class MyHeartMonitor`)
+4. Fill in `connect()` and `read_sample()` using the examples below as a starting point
 
 ---
 
@@ -127,18 +150,13 @@ class MyTCPDevice(PhysicalSensor):
 
 ## What You Need From the Datasheet
 
-| Question | Where it goes |
-|----------|--------------|
-| How does it connect? (USB, BLE, TCP, SDK) | `connect()` |
-| What format is the data? (CSV text, binary, SDK call) | `read_sample()` |
-| How many values per reading? | `channels` |
-| Readings per second? | `sample_rate` |
-
----
-
 ## Starting the Sensor
 
-Standalone script — use `run()`:
+### Standalone test (recommended)
+
+Add this block at the bottom of your file and run it directly to verify the sensor streams correctly before wiring it into the full app.
+
+While the script is running, open the ECHO dashboard and click **Refresh** — your device should appear in the stream list.
 
 ```python
 if __name__ == "__main__":
@@ -153,7 +171,26 @@ if __name__ == "__main__":
     sensor.run()  # blocks until Ctrl+C
 ```
 
-Inside a larger app — use `start()` / `stop()`:
+### Inside `start_all_sensors.py`
+
+To make the sensor launch automatically with the rest of ECHO, add a `default()` classmethod to your class:
+
+```python
+@classmethod
+def default(cls):
+    return cls(
+        uid="device_001",
+        name="MyDevice",
+        type="ECG",
+        channels=3,
+        sample_rate=250,
+        port="/dev/ttyUSB0",
+    )
+```
+
+`start_all_sensors.py` automatically discovers any sensor in `sensors/physical/` that has a `default()` method and starts it along with everything else.
+
+### Inside another script — use `start()` / `stop()`:
 
 ```python
 sensor = MySerialDevice(...)
@@ -161,3 +198,16 @@ sensor.start()   # returns immediately, streams in background
 # ... later ...
 sensor.stop()    # stops streaming and disconnects
 ```
+
+---
+
+## Troubleshooting
+
+| Problem | What to try |
+|---------|-------------|
+| Sensor starts but no stream appears on dashboard | Click **Refresh** in the dashboard. Make sure `name` matches what you expect. |
+| `connect()` throws an error | Check the port name, baud rate, or network address. Make sure drivers are installed. |
+| `read_sample()` returns garbage values | Check the data format — byte order, number of bytes per value, or parsing logic |
+| Sensor appears but immediately disconnects | An unhandled exception in `read_sample()` is stopping the loop — check the terminal for the error |
+| Port not found (serial) | On Windows: check Device Manager for the COM port number. On Mac/Linux: check `/dev/tty.*` |
+| Bluetooth won't connect | Make sure the device is paired and in range. BLE connections can be finicky — try restarting the device. |

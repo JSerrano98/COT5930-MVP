@@ -1,30 +1,45 @@
-# Adding a Sensor to Echo
+# Adding Simple Sensors to ECHO
 
-This guide covers adding **Dummy Sensors** (fake data for testing) and **Derived Sensors** (computed metrics from existing streams). If you need to connect real hardware, see `PHYSICAL_SENSOR_GUIDE.md`.
+This guide covers two types of software-defined sensors you can add to ECHO without any physical hardware:
+
+- **Dummy Sensors** — Generate fake data for testing the app or building new features
+- **Derived Sensors** — Read an existing live stream and compute a new metric from it (e.g., heart rate from ECG)
+
+If you need to connect a real hardware device, see [ADDING PHYSICAL SENSORS.md](ADDING%20PHYSICAL%20SENSORS.md).
+
+---
+
+## What You Need to Know First
+
+ECHO uses **Lab Streaming Layer (LSL)** to move data between sensors and the dashboard. Every sensor — real or fake — publishes its data as a named LSL stream. The dashboard subscribes to those streams automatically.
+
+You do not need to understand LSL deeply. The sensor base classes handle all of that for you. You only need to supply the data itself.
 
 ---
 
 ## Where Files Go
 
 ```
-echo/src/backend/sensors/
-├── sensor.py                      ← don't touch this
-├── dummy_sensor_template.py       ← copy this for fake/test sensors
-├── derived_sensor_template.py     ← copy this for computed metrics
-├── physical/
-├── derived/                       ← your derived sensors go here
-└── dummy/                         ← your dummy sensors go here
+backend/sensors/
+├── sensor.py                      ← base classes — do not modify
+├── dummy/                         ← put your fake/test sensors here
+│   └── fake_ECG.py                  (example)
+├── derived/                       ← put your computed-metric sensors here
+│   └── alpha_band_power.py          (example)
+└── templates/
+    ├── dummy_sensor_template.py   ← copy this to start a dummy sensor
+    └── derived_sensor_template.py ← copy this to start a derived sensor
 ```
 
 ---
 
-## run() vs start()
+## Running a Sensor: `run()` vs `start()`
 
 Every sensor has two ways to launch it.
 
-`sensor.run()` starts the sensor **and blocks** until you press Ctrl+C. Use this when running a sensor by itself as a standalone script.
+`sensor.run()` starts the sensor **and keeps the script running** until you press Ctrl+C. Use this when running a sensor by itself as a standalone script.
 
-`sensor.start()` starts the sensor **in the background** and returns immediately. Use this when starting multiple sensors from the same script, or when launching sensors from inside a larger app like the session manager. If you use `start()` in a standalone script, the script will exit immediately and the sensor will die — so use `run()` instead.
+`sensor.start()` starts the sensor **in the background** and returns to the next line of code immediately. Use this when launching multiple sensors from the same script. If you use `start()` in a standalone script, the script will finish and the sensor will stop — so use `run()` instead for single-sensor scripts.
 
 ---
 
