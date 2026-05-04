@@ -40,15 +40,17 @@ const AppLayout = () => {
   );
 };
 
-const App = () => (
-  <HashRouter>
-    <DevModeProvider>
-      <AlertProvider>
-        <AlertOverlay />
-        <AppLayout />
-      </AlertProvider>
-    </DevModeProvider>
-  </HashRouter>
-);
+const App = () => {
+  return (
+    <HashRouter>
+      <DevModeProvider>
+        <AlertProvider>
+          <AlertOverlay />
+          <AppLayout />
+        </AlertProvider>
+      </DevModeProvider>
+    </HashRouter>
+  );
+};
 
 export default App;
