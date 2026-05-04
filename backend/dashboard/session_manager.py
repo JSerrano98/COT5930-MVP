@@ -9,6 +9,7 @@ import json
 import logging
 import openpyxl
 import struct
+import threading
 
 from pylsl import StreamInlet, resolve_streams
 from pathlib import Path
@@ -107,9 +108,13 @@ class SessionManager:
     def __init__(self):
         self.status = "Offline"
         self.inlets: list[dict] = []
+        self._inlets_lock = threading.RLock()
         self.clients = []  # list[WebSocket]
         self._task: asyncio.Task | None = None
         self.update_rate = 120.  # Hz
+        self._auto_discovery_interval = 5.0
+        self._discovery_thread: threading.Thread | None = None
+        self._discovery_stop = threading.Event()
 
         self._recording = False
         self._record_fmt: str = "csv"
@@ -122,32 +127,90 @@ class SessionManager:
         self._col_map: dict[str, int] = {}
         self._col_headers: list[str] = []
 
+    def _auto_discovery_worker(self):
+        """Background thread: periodically discover new LSL streams without blocking the event loop."""
+        while not self._discovery_stop.wait(timeout=self._auto_discovery_interval):
+            try:
+                self._discover_new_streams_non_disruptive(timeout=0.5)
+            except Exception as exc:
+                log.debug(f"Auto-discovery tick failed: {exc}")
+
     def start(self):
         """Discover streams and begin the broadcast loop."""
-        self.inlets = self._discover_streams()
-        max_rate = max((s["rate"] for s in self.inlets), default=120)
-        if max_rate > 120:
-            log.warning(f"Max stream rate is {max_rate}")
-            self.update_rate = max_rate  # Match the fastest stream if it's above default
+        discovered = self._discover_streams()
+        with self._inlets_lock:
+            self.inlets = discovered
         self._task = asyncio.create_task(self._read_lsl_loop())
+        self._discovery_stop.clear()
+        self._discovery_thread = threading.Thread(
+            target=self._auto_discovery_worker, daemon=True, name="lsl-auto-discovery"
+        )
+        self._discovery_thread.start()
         self.status = "Online"
         log.info(f"Session started... {len(self.inlets)} stream(s) discovered")
 
     async def stop(self):
         """Cancel the broadcast loop and close all inlets."""
+        self._discovery_stop.set()
+        if self._discovery_thread and self._discovery_thread.is_alive():
+            self._discovery_thread.join(timeout=2.0)
+        self._discovery_thread = None
         if self._task:
             self._task.cancel()
             self._task = None
 
-        for stream in self.inlets:
+        with self._inlets_lock:
+            streams_to_close = list(self.inlets)
+            self.inlets = []
+
+        for stream in streams_to_close:
             try:
                 stream["inlet"].close_stream()
             except Exception:
                 pass
-
-        self.inlets = []
         self.status = "Offline"
         log.info("Session stopped")
+
+    @staticmethod
+    def _stream_key(name: str, type_: str, channels: int, source_id: str) -> tuple[str, str, int, str]:
+        return (str(name), str(type_), int(channels), str(source_id or ""))
+
+    def _open_inlet_from_info(self, info) -> dict:
+        inlet = StreamInlet(info, max_buflen=1)
+        inlet.open_stream()
+
+        try:
+            full_info = inlet.info(timeout=3.0)
+        except Exception:
+            full_info = info
+
+        channel_labels = []
+        ch = full_info.desc().child("channels").child("channel")
+        while not ch.empty():
+            label = ch.child_value("label")
+            if label:
+                channel_labels.append(label)
+            ch = ch.next_sibling()
+
+        if len(channel_labels) != info.channel_count():
+            channel_labels = [f"Channel {i+1}" for i in range(info.channel_count())]
+
+        source_id = ""
+        try:
+            source_id = info.source_id() or ""
+        except Exception:
+            source_id = ""
+
+        return {
+            "name": info.name(),
+            "type": info.type(),
+            "channels": info.channel_count(),
+            "rate": info.nominal_srate(),
+            "channel_labels": channel_labels,
+            "source_id": source_id,
+            "stream_key": self._stream_key(info.name(), info.type(), info.channel_count(), source_id),
+            "inlet": inlet,
+        }
 
     def _discover_streams(self, timeout: float = 3.0) -> list[dict]:
         """
@@ -163,35 +226,9 @@ class SessionManager:
 
         result = []
         for info in found:
-            inlet = StreamInlet(info, max_buflen=1)
-            inlet.open_stream()
-
-            try:
-                full_info = inlet.info(timeout=3.0)
-            except Exception:
-                full_info = info
-
-            channel_labels = []
-            ch = full_info.desc().child("channels").child("channel")
-            while not ch.empty():
-                label = ch.child_value("label")
-                if label:
-                    channel_labels.append(label)
-                ch = ch.next_sibling()
-
-            if len(channel_labels) != info.channel_count():
-                channel_labels = [f"Channel {i+1}" for i in range(info.channel_count())]
-
-            result.append({
-                "name": info.name(),
-                "type": info.type(),
-                "channels": info.channel_count(),
-                "rate": info.nominal_srate(),
-                "channel_labels": channel_labels,
-                "inlet": inlet,
-            })
+            result.append(self._open_inlet_from_info(info))
             log.info(f"  SIG: {info.name()} | {info.type()} | {info.channel_count()}ch @ {info.nominal_srate()}Hz")
-            log.info(f"       Labels: {channel_labels}")
+            log.info(f"       Labels: {result[-1]['channel_labels']}")
 
         return result
 
@@ -203,20 +240,216 @@ class SessionManager:
         self.status = "Refreshing"
         log.info("Refreshing streams...")
 
-        for stream in self.inlets:
+        found = resolve_streams(3.0)
+
+        existing_by_key = {}
+        with self._inlets_lock:
+            for s in self.inlets:
+                key = s.get("stream_key")
+                if key is None:
+                    key = self._stream_key(s["name"], s["type"], s["channels"], s.get("source_id", ""))
+                    s["stream_key"] = key
+                existing_by_key[key] = s
+
+        found_info_by_key = {}
+        for info in found:
+            source_id = ""
+            try:
+                source_id = info.source_id() or ""
+            except Exception:
+                source_id = ""
+            key = self._stream_key(info.name(), info.type(), info.channel_count(), source_id)
+            if key not in found_info_by_key:
+                found_info_by_key[key] = info
+
+        keys_existing = set(existing_by_key.keys())
+        keys_found = set(found_info_by_key.keys())
+
+        keys_to_remove = keys_existing - keys_found
+        keys_to_add = keys_found - keys_existing
+
+        stale_streams = [existing_by_key[k] for k in keys_to_remove]
+        new_streams = []
+        for key in keys_to_add:
+            info = found_info_by_key[key]
+            try:
+                new_stream = self._open_inlet_from_info(info)
+                new_streams.append(new_stream)
+                log.info(
+                    f"  SIG: {new_stream['name']} | {new_stream['type']} | "
+                    f"{new_stream['channels']}ch @ {new_stream['rate']}Hz"
+                )
+                log.info(f"       Labels: {new_stream['channel_labels']}")
+            except Exception as exc:
+                log.warning(f"Failed opening inlet for stream '{info.name()}': {exc}")
+
+        for stream in stale_streams:
             try:
                 stream["inlet"].close_stream()
             except Exception:
                 pass
 
-        self.inlets = self._discover_streams(timeout=3.0)
+        with self._inlets_lock:
+            kept_streams = [s for s in self.inlets if s.get("stream_key") not in keys_to_remove]
+            self.inlets = kept_streams + new_streams
+
+        log.info(f"Found {len(self.inlets)} stream(s)")
         self.status = "Online"
         return self.list_streams()
+
+    def _discover_new_streams_non_disruptive(self, timeout: float = 0.2) -> int:
+        """
+        Discover and attach newly appeared streams without removing existing inlets.
+        Returns the number of newly attached streams.
+        """
+        found = resolve_streams(timeout)
+
+        with self._inlets_lock:
+            existing_keys = set()
+            for s in self.inlets:
+                key = s.get("stream_key")
+                if key is None:
+                    key = self._stream_key(s["name"], s["type"], s["channels"], s.get("source_id", ""))
+                    s["stream_key"] = key
+                existing_keys.add(key)
+
+        to_add = []
+        seen = set()
+        for info in found:
+            source_id = ""
+            try:
+                source_id = info.source_id() or ""
+            except Exception:
+                source_id = ""
+            key = self._stream_key(info.name(), info.type(), info.channel_count(), source_id)
+            if key in existing_keys or key in seen:
+                continue
+            seen.add(key)
+            to_add.append(info)
+
+        added = 0
+        for info in to_add:
+            try:
+                stream = self._open_inlet_from_info(info)
+            except Exception as exc:
+                log.debug(f"Auto-discovery failed for '{info.name()}': {exc}")
+                continue
+
+            with self._inlets_lock:
+                if any(s.get("stream_key") == stream.get("stream_key") for s in self.inlets):
+                    try:
+                        stream["inlet"].close_stream()
+                    except Exception:
+                        pass
+                    continue
+                self.inlets.append(stream)
+
+            added += 1
+            log.info(
+                f"Auto-attached stream: {stream['name']} | {stream['type']} | "
+                f"{stream['channels']}ch @ {stream['rate']}Hz"
+            )
+
+        return added
+
+    def attach_stream(self, name: str, stream_type: str | None = None, timeout: float = 2.0, replace_same_name: bool = False) -> bool:
+        """
+        Attach a single stream inlet by name to the active session without a full refresh.
+        Returns True if a new inlet was added, False if no matching stream was found or it already exists.
+        """
+        stream_name = str(name).strip()
+        if not stream_name:
+            return False
+
+        found = resolve_streams(timeout)
+        matches = [s for s in found if s.name() == stream_name]
+        if stream_type:
+            matches = [s for s in matches if s.type() == stream_type]
+        if not matches:
+            return False
+
+        info = matches[0]
+        source_id = ""
+        try:
+            source_id = info.source_id() or ""
+        except Exception:
+            source_id = ""
+        new_key = self._stream_key(info.name(), info.type(), info.channel_count(), source_id)
+
+        with self._inlets_lock:
+            if any(s.get("stream_key") == new_key for s in self.inlets):
+                return False
+
+            stale_same_name = []
+            if replace_same_name:
+                stale_same_name = [
+                    s for s in self.inlets
+                    if s.get("name") == stream_name and (not stream_type or s.get("type") == stream_type)
+                ]
+                if stale_same_name:
+                    self.inlets = [s for s in self.inlets if s not in stale_same_name]
+
+        for stream in stale_same_name:
+            try:
+                stream["inlet"].close_stream()
+            except Exception:
+                pass
+
+        try:
+            new_stream = self._open_inlet_from_info(info)
+        except Exception as exc:
+            log.warning(f"Failed attaching stream '{stream_name}': {exc}")
+            return False
+
+        with self._inlets_lock:
+            if any(s.get("stream_key") == new_stream.get("stream_key") for s in self.inlets):
+                try:
+                    new_stream["inlet"].close_stream()
+                except Exception:
+                    pass
+                return False
+            self.inlets.append(new_stream)
+
+        log.info(
+            f"Attached stream: {new_stream['name']} | {new_stream['type']} | "
+            f"{new_stream['channels']}ch @ {new_stream['rate']}Hz"
+        )
+        return True
+
+    def detach_stream(self, name: str, stream_type: str | None = None) -> int:
+        """
+        Detach stream inlet(s) by name (and optional type) from the active session.
+        Returns the number of removed inlets.
+        """
+        stream_name = str(name).strip()
+        if not stream_name:
+            return 0
+
+        with self._inlets_lock:
+            to_remove = [
+                s for s in self.inlets
+                if s.get("name") == stream_name and (not stream_type or s.get("type") == stream_type)
+            ]
+            if not to_remove:
+                return 0
+            self.inlets = [s for s in self.inlets if s not in to_remove]
+
+        for stream in to_remove:
+            try:
+                stream["inlet"].close_stream()
+            except Exception:
+                pass
+
+        log.info(f"Detached {len(to_remove)} stream(s) named '{stream_name}'")
+        return len(to_remove)
 
     def list_streams(self) -> list[dict]:
         """
         Return metadata for all discovered streams (no inlet objects).
         """
+        with self._inlets_lock:
+            snapshot = list(self.inlets)
+
         return [
             {
                 "name": s["name"],
@@ -225,7 +458,7 @@ class SessionManager:
                 "rate": s["rate"],
                 "channel_labels": s["channel_labels"],
             }
-            for s in self.inlets
+            for s in snapshot
         ]
 
     async def add_client(self, ws):
@@ -245,10 +478,17 @@ class SessionManager:
 
     async def _read_lsl_loop(self):
         while True:
-            for stream in self.inlets:
+            with self._inlets_lock:
+                streams_snapshot = list(self.inlets)
+
+            for stream in streams_snapshot:
                 inlet: StreamInlet = stream["inlet"]
 
-                sample, timestamp = inlet.pull_sample(timeout=0.0)
+                try:
+                    sample, timestamp = inlet.pull_sample(timeout=0.0)
+                except Exception as exc:
+                    log.debug(f"pull_sample failed for {stream.get('name', 'unknown')}: {exc}")
+                    continue
                 if sample is not None:
                     if self._recording:
                         self._record_sample(timestamp, stream["name"], sample)

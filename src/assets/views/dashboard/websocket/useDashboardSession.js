@@ -29,7 +29,7 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
   useEffect(() => {
     if (!window.echo) return;
 
-    window.echo.onSessionStopped(() => {
+    const disposeSessionStopped = window.echo.onSessionStopped?.(() => {
       setSessionRunning(false);
       setSessionStarting(false);
       disconnectWs();
@@ -41,7 +41,11 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
         connectWs();
       }
     });
-  }, []);
+
+    return () => {
+      if (typeof disposeSessionStopped === 'function') disposeSessionStopped();
+    };
+  }, [connectWs, disconnectWs]);
 
   return { sessionRunning, sessionStarting, startSession, stopSession };
 };

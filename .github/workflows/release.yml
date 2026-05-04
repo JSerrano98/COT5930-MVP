@@ -1,0 +1,70 @@
+name: Build & Release
+
+# Triggers:
+#   - Push a version tag (v*) to automatically publish a GitHub Release
+#   - Manual dispatch for ad-hoc builds
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            eb_flag: --win
+          - os: macos-latest
+            eb_flag: --mac
+          - os: ubuntu-latest
+            eb_flag: --linux
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python setup ────────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies + PyInstaller
+        run: pip install -r backend/requirements.txt pyinstaller
+
+      # ── Bundle Python backend ────────────────────────────────────────────────
+      - name: Build backend (PyInstaller)
+        working-directory: backend
+        run: pyinstaller session.spec --noconfirm
+
+      # ── Node setup ──────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      # ── Linux system deps for electron-builder ───────────────────────────────
+      - name: Install Linux packaging dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libarchive-tools
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build Vite frontend
+        run: npm run build:frontend
+
+      - name: Package Electron app
+        run: npx electron-builder ${{ matrix.eb_flag }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

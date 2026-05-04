@@ -1,6 +1,6 @@
 {
   "name": "echo",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "",
   "keywords": [
@@ -23,7 +23,13 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "cross-env NODE_ENV=development electron .",
-    "electron:dev": "concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\""
+    "electron:dev": "concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "build:backend": "cd backend && pyinstaller session.spec --noconfirm",
+    "build:frontend": "vite build",
+    "dist": "npm run build:backend && npm run build:frontend && electron-builder",
+    "dist:win": "npm run build:backend && npm run build:frontend && electron-builder --win",
+    "dist:mac": "npm run build:backend && npm run build:frontend && electron-builder --mac",
+    "dist:linux": "npm run build:backend && npm run build:frontend && electron-builder --linux"
   },
   "build": {
     "appId": "com.fau.cot5930mvp",
@@ -31,14 +37,20 @@
     "files": [
       "dist/**/*",
       "main.js",
+      "preload.cjs",
       "package.json"
     ],
     "extraResources": [
       {
-        "from": "../backend/dist/session",
+        "from": "backend/dist/session",
         "to": "backend/session"
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "JSerrano98",
+      "repo": "COT5930-MVP"
+    },
     "directories": {
       "buildResources": "assets, public"
     },

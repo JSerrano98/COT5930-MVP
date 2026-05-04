@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const FADE_MS = 400;
 
@@ -15,24 +15,34 @@ const SplashScreen = ({ onReady }) => {
   const [fading, setFading] = useState(false);
   const doneRef = useRef(false);
 
-  const finish = () => {
+  const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
     setStatus('Ready');
     setFading(true);
     setTimeout(onReady, FADE_MS);
-  };
+  }, [onReady]);
 
   useEffect(() => {
+    if (!window.echo?.getStartupStatus) {
+      // Not running in Electron — skip immediately
+      finish();
+      return;
+    }
     window.echo.getStartupStatus().then(({ done }) => {
       if (done) {
         finish();
         return;
       }
+      // Register listeners then re-check status to close the race window where
+      // startup:ready fires between the first check and listener registration.
       window.echo.onStartupStatus((msg) => setStatus(msg));
       window.echo.onStartupReady(() => finish());
+      window.echo.getStartupStatus().then(({ done: nowDone }) => {
+        if (nowDone) finish();
+      });
     });
-  }, []);
+  }, [finish]);
 
   return (
     <div

@@ -3,6 +3,27 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 const WS_URL = 'ws://localhost:8000/ws';
 const API_URL = 'http://localhost:8000';
 
+const streamKey = (s) => `${s?.name ?? ''}|${s?.type ?? ''}|${s?.channels ?? ''}|${s?.rate ?? ''}`;
+
+const normalizeStreams = (list = []) =>
+  [...list].sort((a, b) => {
+    const an = a?.name ?? '';
+    const bn = b?.name ?? '';
+    return an.localeCompare(bn);
+  });
+
+const sameStreams = (a = [], b = []) => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const aa = normalizeStreams(a);
+  const bb = normalizeStreams(b);
+  for (let i = 0; i < aa.length; i += 1) {
+    if (streamKey(aa[i]) !== streamKey(bb[i])) return false;
+  }
+  return true;
+};
+
 export const useDashboardWebSocket = () => {
   const [connected, setConnected] = useState(false);
   const [streams, setStreams] = useState([]);
@@ -12,25 +33,31 @@ export const useDashboardWebSocket = () => {
   const reconnectTimer = useRef(null);
   const manualDisconnect = useRef(false);
 
-  const fetchStreams = useCallback(async () => {
-    setLoading(true);
+  const fetchStreams = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`${API_URL}/streams`);
-      if (res.ok) setStreams(await res.json());
+      if (res.ok) {
+        const next = normalizeStreams(await res.json());
+        setStreams((prev) => (sameStreams(prev, next) ? prev : next));
+      }
     } catch { /* server may not be up yet */ }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   const refreshStreams = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/refresh`, { method: 'POST' });
-      if (res.ok) setStreams(await res.json());
+      if (res.ok) {
+        const next = normalizeStreams(await res.json());
+        setStreams((prev) => (sameStreams(prev, next) ? prev : next));
+      }
     } catch { /* server may not be up yet */ }
     setLoading(false);
   }, []);
 
-  const connectWs = useCallback(() => {
+  const connectWs = useCallback(function openSocket() {
     if (wsRef.current && wsRef.current.readyState <= 1) return;
     manualDisconnect.current = false;
 
@@ -57,13 +84,13 @@ export const useDashboardWebSocket = () => {
       ws.onclose = () => {
         setConnected(false);
         if (!manualDisconnect.current)
-          reconnectTimer.current = setTimeout(connectWs, 2000);
+          reconnectTimer.current = setTimeout(openSocket, 2000);
       };
 
       ws.onerror = () => ws.close();
       wsRef.current = ws;
     } catch {
-      reconnectTimer.current = setTimeout(connectWs, 2000);
+      reconnectTimer.current = setTimeout(openSocket, 2000);
     }
   }, [fetchStreams]);
 
@@ -82,6 +109,13 @@ export const useDashboardWebSocket = () => {
     }, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!connected) return;
+
+    fetchStreams({ silent: true });
+    return undefined;
+  }, [connected, fetchStreams]);
 
   return { connected, streams, loading, dataRef, connectWs, disconnectWs, refreshStreams };
 };

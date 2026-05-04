@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import ReactFlow, { Background, Controls, addEdge, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Monitor from './monitor/Monitor';
@@ -54,11 +54,15 @@ const TempFlowNode = ({ data }) => (
   </Monitor>
 );
 
-const MLFlowNode = ({ data }) => (
-  <Monitor stream={data.stream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
-    <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
-  </Monitor>
-);
+const MLFlowNode = ({ data }) => {
+  const modelName = data.monitor?.sensorName || null;
+  const displayStream = data.stream || (modelName ? { name: modelName } : null);
+  return (
+    <Monitor stream={displayStream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
+      <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
+    </Monitor>
+  );
+};
 
 const CSVReplayFlowNode = ({ data }) => (
   <Monitor stream={data.stream} nodeType="csvReplay" onRemove={data.onRemove} dataRef={data.dataRef}>
@@ -97,7 +101,9 @@ const NODE_DEFAULTS = {
 };
 
 function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpdateMonitor, onRecordingChange }) {
-  const makeNode = (mon, idx, posMap = {}, sizeMap = {}) => {
+  const streamsRef = useRef(streams);
+
+  const makeNode = useCallback((mon, idx, posMap = {}, sizeMap = {}) => {
     const defaultSize = NODE_DEFAULTS[mon.nodeType]
       ? { width: NODE_DEFAULTS[mon.nodeType].width, height: NODE_DEFAULTS[mon.nodeType].height }
       : { width: DEFAULT_W, height: DEFAULT_H };
@@ -108,7 +114,7 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
       data: {
         stream: mon.stream,
         monitor: mon,
-        streams,
+        streams: mon.nodeType === 'ml' ? streamsRef.current : undefined,
         dataRef,
         lineColor: mon.lineColor,
         onColorChange: c => onUpdateMonitor(mon.id, { lineColor: c }),
@@ -118,9 +124,9 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
       },
       style: sizeMap[mon.id] ?? defaultSize,
     };
-  };
+  }, [dataRef, onUpdateMonitor, onRecordingChange, onRemove]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(monitors.map((m, i) => makeNode(m, i)));
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesState] = useEdgesState([]);
 
   useEffect(() => {
@@ -129,7 +135,18 @@ function DashboardCanvas({ monitors = [], streams = [], dataRef, onRemove, onUpd
       const sizeMap = Object.fromEntries(prev.map(n => [n.id, n.style]));
       return monitors.map((mon, idx) => makeNode(mon, idx, posMap, sizeMap));
     });
-  }, [monitors]);
+  }, [monitors, makeNode, setNodes]);
+
+  useEffect(() => {
+    streamsRef.current = streams;
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.type !== 'ml') return n;
+        if (n.data?.streams === streams) return n;
+        return { ...n, data: { ...n.data, streams } };
+      }),
+    );
+  }, [streams, setNodes]);
 
   const onConnect = useCallback((params) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 

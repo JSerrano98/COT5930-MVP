@@ -1,30 +1,19 @@
 
-
-
-
-
-
-
-
-import sys
-
-
 import logging
 import pickle
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from dashboard.session_manager import SessionManager
 from machine_learning.router import router as ml_router
 from sensors.ml_sensor import MLPredictionSensor
 from sensors.dummy.csv_replay import CSVReplaySensor
 import os
+import numpy as np
 import pandas as pd
-
-
-STORAGE_PATH = './data/CSV'
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 session = SessionManager()
@@ -78,8 +67,6 @@ def list_streams():
 def refresh_streams():
     return session.refresh()
 
-from pydantic import BaseModel
-
 class RecordStartRequest(BaseModel):
     file_path: str | None = None
     format: str = "csv"  # "csv" or "xlsx"
@@ -105,58 +92,22 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         session.remove_client(ws)
 
-
-
-
-@app.get('/replay')
-def replay():
-     return {"ok": True, "status": 'success'}
-
-
-@app.get('/CSV/')
-def list_files():
-    print('help')
-    try:
-        files = os.listdir(STORAGE_PATH)
-        return files
-    except FileNotFoundError:
-        return {"error": "Directory not found"}, 404
-
-
-@app.get('/ML/')
-async def read_user_item(file: str):
-    print(file)
-    try:
-        
-        df = pd.read_csv(STORAGE_PATH + '/'  + file )
-        columns = df.columns.to_list()
-        return columns
-    except:
-        print('test for multiple file types')
-    try:
-        df = pd.read_excel(STORAGE_PATH + '/' + file)
-        columns = df.columns.to_list()
-        return columns
-    except:
-        return {"error": "Invalid file type"}, 400
-
-
-
 _ml_sensors: dict[str, MLPredictionSensor] = {}
 _csv_replays: dict[str, dict] = {}
+_ml_model_cache: dict[str, dict] = {}  # resolved_path → loaded bundle
 
 
 class MLSensorStartRequest(BaseModel):
     uid: str
     name: str
     source_name: str = ""
-    source_names: list[str] = []
+    source_names: list[str] = Field(default_factory=list)
     model_path: str
     source_type: str = ""
     buffer_seconds: float = 2.0
     process_interval: float = 0.1
     sample_rate: float = 0.0   # 0 = irregular (predict-on-demand)
-    feature_aliases: dict[str, str] = {}
+    feature_aliases: dict[str, str] = Field(default_factory=dict)
 
 
 def _resolve_model_path(path: str) -> str:
@@ -199,7 +150,7 @@ class CSVReplayStartRequest(BaseModel):
     name: str
     csv_path: str
     timestamp_column: str = "timestamp"
-    channel_labels: list[str] = []
+    channel_labels: list[str] = Field(default_factory=list)
     loop: bool = False
     use_csv_timing: bool = True
     time_scale: float = 1.0
@@ -364,10 +315,62 @@ def stop_csv_replay(uid: str):
     return {"ok": True, "uid": uid, "saved_to": state.get("saved_to")}
 
 
+class MLInferRequest(BaseModel):
+    model_path: str
+    features: list[float]
+
+
+@app.post("/ml-sensors/infer")
+def infer_ml_sensor(req: MLInferRequest):
+    """Run a single inference from a pre-assembled feature vector.
+
+    The frontend assembles features directly from its dataRef (the same stream
+    data the session recorder uses), so the backend only needs to load the model
+    and run predict — no LSL inlets required here.
+    """
+    resolved = _resolve_model_path(req.model_path)
+    if resolved not in _ml_model_cache:
+        if not os.path.exists(resolved):
+            raise HTTPException(status_code=404, detail=f"Model file not found: {resolved}")
+        try:
+            with open(resolved, "rb") as f:
+                _ml_model_cache[resolved] = pickle.load(f)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to load model: {exc}") from exc
+
+    bundle = _ml_model_cache[resolved]
+    model = bundle["model"]
+    task = str(bundle.get("task", "regression")).strip().lower()
+    feature_cols = [str(c) for c in (bundle.get("feature_cols", []) or [])]
+    has_proba = task == "classification" and hasattr(model, "predict_proba")
+
+    features = np.asarray(req.features, dtype=float)
+    if feature_cols and len(feature_cols) == len(features):
+        X = pd.DataFrame([features], columns=feature_cols)
+    else:
+        X = features.reshape(1, -1)
+
+    try:
+        prediction = float(model.predict(X)[0])
+        result: dict = {"ok": True, "prediction": prediction}
+        if has_proba:
+            proba = model.predict_proba(X)[0]
+            result["confidence"] = float(np.max(proba))
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Inference failed: {exc}") from exc
+
+
 @app.post("/ml-sensors/start")
 def start_ml_sensor(req: MLSensorStartRequest):
-    if req.uid in _ml_sensors:
-        return {"ok": True, "uid": req.uid, "note": "already running"}
+    restarted = False
+    existing = _ml_sensors.pop(req.uid, None)
+    if existing is not None:
+        try:
+            existing.stop()
+        except Exception as exc:
+            logging.warning(f"Failed to stop existing ML sensor '{req.uid}' before restart: {exc}")
+        restarted = True
 
     source_names = [s.strip() for s in req.source_names if str(s).strip()]
     if req.source_name.strip() and req.source_name.strip() not in source_names:
@@ -396,17 +399,24 @@ def start_ml_sensor(req: MLSensorStartRequest):
     _ml_sensors[req.uid] = sensor
 
     if session.status == "Online":
-        try:
-            session.refresh()
-        except Exception as exc:
-            logging.warning(f"Failed to refresh session after ML sensor start: {exc}")
+        attached = session.attach_stream(req.name, stream_type="ML", timeout=2.0, replace_same_name=True)
+        if not attached:
+            logging.warning(f"ML stream '{req.name}' was not attached to session manager (may already be attached)")
 
     return {
         "ok": True,
         "uid": req.uid,
         "name": req.name,
+        "restarted": restarted,
         "source_names": source_names,
         "feature_aliases": req.feature_aliases,
+        "stream": {
+            "name": req.name,
+            "type": "ML",
+            "channels": int(sensor.channels),
+            "rate": float(sensor.sample_rate),
+            "channel_labels": list(getattr(sensor, "channel_labels", [])),
+        },
     }
 
 
@@ -416,6 +426,10 @@ def stop_ml_sensor(uid: str):
     if sensor is None:
         return {"ok": False, "error": f"No ML sensor with uid '{uid}'"}
     sensor.stop()
+
+    if session.status == "Online":
+        session.detach_stream(sensor.name, stream_type="ML")
+
     return {"ok": True, "uid": uid}
 
 

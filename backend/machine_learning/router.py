@@ -25,7 +25,7 @@ from .model_workbench import (
 logger    = logging.getLogger(__name__)
 router    = APIRouter(prefix="/ml", tags=["ML"])
 
-_BASE       = os.path.dirname(os.path.dirname(__file__))
+_BASE         = os.environ.get('APP_USER_DATA') or os.path.dirname(os.path.dirname(__file__))
 PIPELINES_DIR = os.path.join(_BASE, "ml_pipelines")
 MODELS_DIR    = os.path.join(_BASE, "ml_models")
 
@@ -71,6 +71,16 @@ class ModelTrainSchema(BaseModel):
     random_state: int = 42
     shuffle: bool = True
     save_dir: str = ""   # optional override for output directory
+    # Prepare step
+    scaler: str = "none"
+    poly_degree: int = 1
+    log_transform_cols: list[str] = Field(default_factory=list)
+    sqrt_transform_cols: list[str] = Field(default_factory=list)
+    feature_selection: str = "none"
+    feature_selection_k: int = 10
+    variance_threshold: float = 0.0
+    correlation_threshold: float = 0.95
+    feature_cols: list[str] = Field(default_factory=list)
 
 
 class DatasetColumnsSchema(BaseModel):
@@ -86,6 +96,7 @@ class CleanDatasetSchema(BaseModel):
     dataset_path: str
     drop_duplicates: bool = False
     column_ops: list[ColumnOpSchema] = Field(default_factory=list)
+    clean_dir: str = ''
 
 
 
@@ -125,6 +136,7 @@ async def clean_dataset_endpoint(body: CleanDatasetSchema):
             body.dataset_path,
             body.drop_duplicates,
             [op.model_dump() for op in body.column_ops],
+            body.clean_dir,
         )
         return result
     except FileNotFoundError as exc:
@@ -157,6 +169,15 @@ async def train_workbench_model(payload: ModelTrainSchema):
             val_size=payload.val_size,
             random_state=payload.random_state,
             shuffle=payload.shuffle,
+            scaler=payload.scaler,
+            poly_degree=payload.poly_degree,
+            log_transform_cols=payload.log_transform_cols,
+            sqrt_transform_cols=payload.sqrt_transform_cols,
+            feature_selection=payload.feature_selection,
+            feature_selection_k=payload.feature_selection_k,
+            variance_threshold=payload.variance_threshold,
+            correlation_threshold=payload.correlation_threshold,
+            feature_cols=payload.feature_cols,
         )
         _ensure_dirs()
         out_dir = payload.save_dir.strip() if payload.save_dir.strip() else MODELS_DIR

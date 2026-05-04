@@ -1,25 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import MLIntake from './MLIntake';
 import MLClean from './MLClean';
+import MLPrepare, { DEFAULT_PREPARE } from './MLPrepare';
 
 const BACKEND = 'http://localhost:8000';
 
 const ML_STATE_KEY = 'echo_ml_state';
+const ML_PREPARE_KEY = 'echo_ml_prepare';
+const CLEAN_CACHE_KEY = 'echo_ml_clean_cache';
 const WORKBENCH_MODELS_KEY = 'echo_ml_workbench_models';
 const WORKBENCH_STATE_KEY = 'echo_ml_workbench_state';
 
-const readJSON = (key, fallback = {}) => {
-  try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
+const readJSON = (storage, key, fallback = {}) => {
+  try { return JSON.parse(storage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
 };
 
 const readMLState = () => {
-  return readJSON(ML_STATE_KEY, {});
+  return readJSON(sessionStorage, ML_STATE_KEY, {});
 };
 
-const readWorkbenchModels = () => readJSON(WORKBENCH_MODELS_KEY, {});
+const readWorkbenchModels = () => readJSON(localStorage, WORKBENCH_MODELS_KEY, {});
 
 const readWorkbenchState = (datasetPath, taskType) => {
-  const state = readJSON(WORKBENCH_STATE_KEY, {});
+  const state = readJSON(sessionStorage, WORKBENCH_STATE_KEY, {});
   if (state.datasetPath === datasetPath && state.taskType === taskType) return state;
   return null;
 };
@@ -50,14 +53,6 @@ const formatMetric = (value) => {
   return value.toFixed(4);
 };
 
-const getModelsDir = () =>
-  localStorage.getItem('echo_models_dir') || 'backend/ml_models';
-
-const getModelFilePreview = (modelName, modelKey) => {
-  const rawName = (modelName?.trim() || modelKey || 'model').replace(/\s+/g, '_');
-  return `${rawName}.pkl`;
-};
-
 const MLTrainForm = ({ intake, onBack }) => {
   const cachedState = useMemo(
     () => readWorkbenchState(intake.datasetPath, intake.taskType),
@@ -70,7 +65,6 @@ const MLTrainForm = ({ intake, onBack }) => {
   const [labelCol, setLabelCol]       = useState(() => cachedState?.labelCol ?? '');
   const [split, setSplit]             = useState(() => cachedState?.split ?? DEFAULT_SPLIT);
   const [columns, setColumns]         = useState(() => cachedState?.columns ?? []);
-  const [datasetRows, setDatasetRows] = useState(() => cachedState?.datasetRows ?? null);
   const [result, setResult]           = useState(() => cachedState?.result ?? null);
   const [error, setError]             = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -83,7 +77,7 @@ const MLTrainForm = ({ intake, onBack }) => {
     [models, intake.taskType]
   );
 
-  const fetchModels = () => {
+  const fetchModels = useCallback(() => {
     setModelsLoading(true);
     setError('');
     fetch(`${BACKEND}/ml/workbench/models`)
@@ -102,11 +96,36 @@ const MLTrainForm = ({ intake, onBack }) => {
       })
       .catch((err) => setError(String(err.message ?? err)))
       .finally(() => setModelsLoading(false));
-  };
+  }, [intake.taskType, modelKey]);
+
+  const loadColumns = useCallback(async () => {
+    setColumnsLoading(true);
+    setError('');
+    try {
+      const res  = await fetch(`${BACKEND}/ml/workbench/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_path: intake.datasetPath }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'Failed to load columns');
+      setColumns(data.columns ?? []);
+      setColumnsLoaded(true);
+      if (data.columns?.length) {
+        setLabelCol((prev) => (prev && data.columns.includes(prev) ? prev : data.columns[0]));
+      }
+      return data;
+    } catch (err) {
+      setError(String(err.message ?? err));
+      return null;
+    } finally {
+      setColumnsLoading(false);
+    }
+  }, [intake.datasetPath]);
 
   useEffect(() => {
     fetchModels();
-  }, [intake.taskType]);
+  }, [fetchModels]);
 
   useEffect(() => {
     if (!Object.keys(filteredModels).length) return;
@@ -132,7 +151,6 @@ const MLTrainForm = ({ intake, onBack }) => {
       labelCol,
       split,
       columns,
-      datasetRows,
       result,
       columnsLoaded,
     };
@@ -145,7 +163,6 @@ const MLTrainForm = ({ intake, onBack }) => {
     labelCol,
     split,
     columns,
-    datasetRows,
     result,
     columnsLoaded,
   ]);
@@ -153,9 +170,7 @@ const MLTrainForm = ({ intake, onBack }) => {
   useEffect(() => {
     if (!intake.datasetPath || columnsLoaded) return;
     loadColumns();
-  }, [intake.datasetPath]);
-
-  const modelSpec = useMemo(() => models[modelKey] ?? null, [models, modelKey]);
+  }, [intake.datasetPath, columnsLoaded, loadColumns]);
 
   const onModelChange = (nextKey) => {
     setModelKey(nextKey);
@@ -164,31 +179,7 @@ const MLTrainForm = ({ intake, onBack }) => {
     setError('');
   };
 
-  const loadColumns = async () => {
-    setColumnsLoading(true);
-    setError('');
-    try {
-      const res  = await fetch(`${BACKEND}/ml/workbench/columns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_path: intake.datasetPath }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to load columns');
-      setColumns(data.columns ?? []);
-      setDatasetRows(data.rows ?? null);
-      setColumnsLoaded(true);
-      if (data.columns?.length) {
-        setLabelCol((prev) => (prev && data.columns.includes(prev) ? prev : data.columns[0]));
-      }
-      return data;
-    } catch (err) {
-      setError(String(err.message ?? err));
-      return null;
-    } finally {
-      setColumnsLoading(false);
-    }
-  };
+  const modelSpec = useMemo(() => models[modelKey] ?? null, [models, modelKey]);
 
   const train = async () => {
     if (!modelKey) {
@@ -212,6 +203,16 @@ const MLTrainForm = ({ intake, onBack }) => {
         params,
         save_dir: localStorage.getItem('echo_models_dir') || 'backend/ml_models',
         ...split,
+        // Prepare step settings
+        scaler: intake.prepare?.scaler ?? 'none',
+        poly_degree: intake.prepare?.polyDegree ?? 1,
+        log_transform_cols: intake.prepare?.logTransformCols ?? [],
+        sqrt_transform_cols: intake.prepare?.sqrtTransformCols ?? [],
+        feature_selection: intake.prepare?.featureSelection ?? 'none',
+        feature_selection_k: intake.prepare?.kBestK ?? 10,
+        variance_threshold: intake.prepare?.varianceThreshold ?? 0.0,
+        correlation_threshold: intake.prepare?.correlationThreshold ?? 0.95,
+        feature_cols: intake.prepare?.featureSelection === 'manual' ? (intake.prepare?.selectedCols ?? []) : [],
       };
       const res  = await fetch(`${BACKEND}/ml/workbench/train`, {
         method: 'POST',
@@ -221,19 +222,14 @@ const MLTrainForm = ({ intake, onBack }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? 'Training failed');
       setResult(data);
+      // Clear the clean cache — model is trained, dataset session is done
+      try { localStorage.removeItem(CLEAN_CACHE_KEY); } catch { /* ignore */ }
     } catch (err) {
       setError(String(err.message ?? err));
     } finally {
       setTraining(false);
     }
   };
-
-  const taskLabel = intake.taskType === 'regression' ? 'Regression' : 'Classification';
-  const taskColor = intake.taskType === 'regression'
-    ? 'text-echo-blue border-echo-blue/40 bg-echo-blue/10'
-    : 'text-purple-400 border-purple-500/40 bg-purple-500/10';
-  const saveDir = getModelsDir();
-  const saveFile = getModelFilePreview(intake.modelName, modelKey);
 
   return (
     <div className="h-full w-full overflow-auto bg-echo-bg">
@@ -277,8 +273,7 @@ const MLTrainForm = ({ intake, onBack }) => {
             </label>
 
             <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body">
-              <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[\/\\]/).pop()}</span></p>
-              <p className="mt-1">Rows: <span className="font-ui font-semibold text-white">{datasetRows ?? '—'}</span></p>
+              <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[/\\]/).pop()}</span></p>
               {!columnsLoaded && (
                 <button onClick={loadColumns} disabled={columnsLoading} className="mt-2 text-[10px] text-echo-green underline disabled:opacity-50 font-ui">
                   Load columns
@@ -416,17 +411,54 @@ const DEFAULT_INTAKE = { datasetPath: '', taskType: '', modelName: '' };
 
 const MachineLearning = () => {
   const [intake, setIntake] = useState(() => readMLState().intake  ?? DEFAULT_INTAKE);
+  const [prepare, setPrepare] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(ML_PREPARE_KEY) ?? 'null') ?? { ...DEFAULT_PREPARE }; } catch { return { ...DEFAULT_PREPARE }; }
+  });
   const [step, setStep]     = useState(() => {
     const saved = readMLState();
     const ok = saved.intake?.datasetPath?.trim() && saved.intake?.taskType?.trim();
     return ok ? (saved.step ?? 'intake') : 'intake';
   });
 
-  const handleIntakeChange = (patch) => setIntake((prev) => ({ ...prev, ...patch }));
+  useEffect(() => {
+    // One-time migration: wipe any ML state that was previously stored in localStorage
+    // (CLEAN_CACHE_KEY intentionally kept — it persists until new file or training)
+    try { localStorage.removeItem(ML_STATE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(ML_PREPARE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(WORKBENCH_STATE_KEY); } catch { /* ignore */ }
+  }, []);
+
+  const clearDatasetScopedState = () => {
+    try { localStorage.removeItem(CLEAN_CACHE_KEY); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(WORKBENCH_STATE_KEY); } catch { /* ignore */ }
+    setPrepare({ ...DEFAULT_PREPARE });
+  };
+
+  const handleIntakeChange = (patch) => {
+    const { resetSession = false, ...nextPatch } = patch;
+    const datasetChanged = Object.prototype.hasOwnProperty.call(nextPatch, 'datasetPath')
+      && nextPatch.datasetPath
+      && nextPatch.datasetPath !== intake.datasetPath;
+
+    if (resetSession && datasetChanged) {
+      clearDatasetScopedState();
+      if (step !== 'intake') setStep('clean');
+    }
+
+    setIntake((prev) => ({ ...prev, ...nextPatch }));
+  };
+  const handlePrepareChange = (next) => setPrepare(next);
 
   useEffect(() => {
-    try { localStorage.setItem(ML_STATE_KEY, JSON.stringify({ step, intake })); } catch { /* quota */ }
+    try { sessionStorage.setItem(ML_STATE_KEY, JSON.stringify({ step, intake })); } catch { /* quota */ }
   }, [step, intake]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(ML_PREPARE_KEY, JSON.stringify(prepare)); } catch { /* quota */ }
+  }, [prepare]);
+
+  // Attach prepare to intake so MLTrainForm can read it from one prop
+  const intakeWithPrepare = { ...intake, prepare };
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -439,11 +471,20 @@ const MachineLearning = () => {
             intake={intake}
             onIntakeChange={handleIntakeChange}
             onBack={() => setStep('intake')}
+            onContinue={() => setStep('prepare')}
+          />
+        )}
+        {step === 'prepare' && (
+          <MLPrepare
+            intake={intake}
+            prepare={prepare}
+            onPrepareChange={handlePrepareChange}
+            onBack={() => setStep('clean')}
             onContinue={() => setStep('configure')}
           />
         )}
         {step === 'configure' && (
-          <MLTrainForm intake={intake} onBack={() => setStep('clean')} />
+          <MLTrainForm intake={intakeWithPrepare} onBack={() => setStep('prepare')} />
         )}
       </div>
     </div>
