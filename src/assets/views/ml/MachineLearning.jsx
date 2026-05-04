@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import MLIntake from './MLIntake';
 import MLClean from './MLClean';
 import MLPrepare, { DEFAULT_PREPARE } from './MLPrepare';
@@ -53,14 +53,6 @@ const formatMetric = (value) => {
   return value.toFixed(4);
 };
 
-const getModelsDir = () =>
-  localStorage.getItem('echo_models_dir') || 'backend/ml_models';
-
-const getModelFilePreview = (modelName, modelKey) => {
-  const rawName = (modelName?.trim() || modelKey || 'model').replace(/\s+/g, '_');
-  return `${rawName}.pkl`;
-};
-
 const MLTrainForm = ({ intake, onBack }) => {
   const cachedState = useMemo(
     () => readWorkbenchState(intake.datasetPath, intake.taskType),
@@ -73,7 +65,6 @@ const MLTrainForm = ({ intake, onBack }) => {
   const [labelCol, setLabelCol]       = useState(() => cachedState?.labelCol ?? '');
   const [split, setSplit]             = useState(() => cachedState?.split ?? DEFAULT_SPLIT);
   const [columns, setColumns]         = useState(() => cachedState?.columns ?? []);
-  const [datasetRows, setDatasetRows] = useState(() => cachedState?.datasetRows ?? null);
   const [result, setResult]           = useState(() => cachedState?.result ?? null);
   const [error, setError]             = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -86,7 +77,7 @@ const MLTrainForm = ({ intake, onBack }) => {
     [models, intake.taskType]
   );
 
-  const fetchModels = () => {
+  const fetchModels = useCallback(() => {
     setModelsLoading(true);
     setError('');
     fetch(`${BACKEND}/ml/workbench/models`)
@@ -105,11 +96,36 @@ const MLTrainForm = ({ intake, onBack }) => {
       })
       .catch((err) => setError(String(err.message ?? err)))
       .finally(() => setModelsLoading(false));
-  };
+  }, [intake.taskType, modelKey]);
+
+  const loadColumns = useCallback(async () => {
+    setColumnsLoading(true);
+    setError('');
+    try {
+      const res  = await fetch(`${BACKEND}/ml/workbench/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_path: intake.datasetPath }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? 'Failed to load columns');
+      setColumns(data.columns ?? []);
+      setColumnsLoaded(true);
+      if (data.columns?.length) {
+        setLabelCol((prev) => (prev && data.columns.includes(prev) ? prev : data.columns[0]));
+      }
+      return data;
+    } catch (err) {
+      setError(String(err.message ?? err));
+      return null;
+    } finally {
+      setColumnsLoading(false);
+    }
+  }, [intake.datasetPath]);
 
   useEffect(() => {
     fetchModels();
-  }, [intake.taskType]);
+  }, [fetchModels]);
 
   useEffect(() => {
     if (!Object.keys(filteredModels).length) return;
@@ -135,7 +151,6 @@ const MLTrainForm = ({ intake, onBack }) => {
       labelCol,
       split,
       columns,
-      datasetRows,
       result,
       columnsLoaded,
     };
@@ -148,7 +163,6 @@ const MLTrainForm = ({ intake, onBack }) => {
     labelCol,
     split,
     columns,
-    datasetRows,
     result,
     columnsLoaded,
   ]);
@@ -156,9 +170,7 @@ const MLTrainForm = ({ intake, onBack }) => {
   useEffect(() => {
     if (!intake.datasetPath || columnsLoaded) return;
     loadColumns();
-  }, [intake.datasetPath]);
-
-  const modelSpec = useMemo(() => models[modelKey] ?? null, [models, modelKey]);
+  }, [intake.datasetPath, columnsLoaded, loadColumns]);
 
   const onModelChange = (nextKey) => {
     setModelKey(nextKey);
@@ -167,31 +179,7 @@ const MLTrainForm = ({ intake, onBack }) => {
     setError('');
   };
 
-  const loadColumns = async () => {
-    setColumnsLoading(true);
-    setError('');
-    try {
-      const res  = await fetch(`${BACKEND}/ml/workbench/columns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_path: intake.datasetPath }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? 'Failed to load columns');
-      setColumns(data.columns ?? []);
-      setDatasetRows(data.rows ?? null);
-      setColumnsLoaded(true);
-      if (data.columns?.length) {
-        setLabelCol((prev) => (prev && data.columns.includes(prev) ? prev : data.columns[0]));
-      }
-      return data;
-    } catch (err) {
-      setError(String(err.message ?? err));
-      return null;
-    } finally {
-      setColumnsLoading(false);
-    }
-  };
+  const modelSpec = useMemo(() => models[modelKey] ?? null, [models, modelKey]);
 
   const train = async () => {
     if (!modelKey) {
@@ -243,13 +231,6 @@ const MLTrainForm = ({ intake, onBack }) => {
     }
   };
 
-  const taskLabel = intake.taskType === 'regression' ? 'Regression' : 'Classification';
-  const taskColor = intake.taskType === 'regression'
-    ? 'text-echo-blue border-echo-blue/40 bg-echo-blue/10'
-    : 'text-purple-400 border-purple-500/40 bg-purple-500/10';
-  const saveDir = getModelsDir();
-  const saveFile = getModelFilePreview(intake.modelName, modelKey);
-
   return (
     <div className="h-full w-full overflow-auto bg-echo-bg">
       <div className="mx-auto w-full max-w-7xl px-6 py-6">
@@ -292,8 +273,7 @@ const MLTrainForm = ({ intake, onBack }) => {
             </label>
 
             <div className="border border-echo-border bg-echo-surface-2 px-3 py-2 text-xs text-echo-muted font-body">
-              <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[\/\\]/).pop()}</span></p>
-              <p className="mt-1">Rows: <span className="font-ui font-semibold text-white">{datasetRows ?? '—'}</span></p>
+              <p>Dataset: <span className="break-all font-ui font-semibold text-white">{intake.datasetPath.split(/[/\\]/).pop()}</span></p>
               {!columnsLoaded && (
                 <button onClick={loadColumns} disabled={columnsLoading} className="mt-2 text-[10px] text-echo-green underline disabled:opacity-50 font-ui">
                   Load columns
@@ -462,7 +442,7 @@ const MachineLearning = () => {
 
     if (resetSession && datasetChanged) {
       clearDatasetScopedState();
-      setStep('clean');
+      if (step !== 'intake') setStep('clean');
     }
 
     setIntake((prev) => ({ ...prev, ...nextPatch }));

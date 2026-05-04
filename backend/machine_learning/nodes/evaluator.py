@@ -3,7 +3,6 @@ Evaluator node — computes evaluation metrics on the test split.
 """
 
 from __future__ import annotations
-import numpy as np
 
 
 def run(config: dict, upstream):

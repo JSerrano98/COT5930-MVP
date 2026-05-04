@@ -124,11 +124,9 @@ def get_dataset_columns(dataset_path: str) -> dict[str, Any]:
     if not os.path.exists(resolved):
         raise FileNotFoundError(f"Dataset not found: {resolved}")
 
-    df = pd.read_csv(resolved, nrows=1)
-    total = _count_csv_rows(resolved)
+    # Header-only read keeps label dropdown responsive even for very large files.
+    df = pd.read_csv(resolved, nrows=0)
     return {
-        "path": resolved,
-        "rows": total,
         "columns": list(df.columns),
     }
 

@@ -11,7 +11,7 @@ const PathSetting = ({ label, description, storageKey, defaultValue, electronGet
       if (p) { setValue(p); localStorage.setItem(storageKey, p); }
       else    { setValue(defaultValue); }
     }).catch(() => setValue(defaultValue));
-  }, []);
+  }, [defaultValue, electronGetter, storageKey]);
 
   const handleChange = (v) => {
     setValue(v);

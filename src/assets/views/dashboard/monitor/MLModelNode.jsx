@@ -29,10 +29,13 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
   const [debugOpen, setDebugOpen] = useState(false);
   const inferBusyRef = useRef(false);
 
-  const selectedSourceNames = Array.isArray(monitor.sourceNames)
-    ? monitor.sourceNames
-    : (monitor.sourceName ? [monitor.sourceName] : []);
-  const manualAliases = monitor.featureAliases || {};
+  const selectedSourceNames = useMemo(
+    () => (Array.isArray(monitor.sourceNames)
+      ? monitor.sourceNames
+      : (monitor.sourceName ? [monitor.sourceName] : [])),
+    [monitor.sourceNames, monitor.sourceName],
+  );
+  const manualAliases = useMemo(() => monitor.featureAliases || {}, [monitor.featureAliases]);
 
   const availableChannels = useMemo(() => {
     const sourceFilter = selectedSourceNames.length ? new Set(selectedSourceNames) : null;
@@ -279,7 +282,7 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
         } else {
           setError(data.detail ?? data.error ?? 'Inference error');
         }
-      } catch (_) {
+      } catch {
         // ignore transient network errors during inference
       } finally {
         inferBusyRef.current = false;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const MAX_CH      = 32;
 const MAX_SAMPLES = 10_000;
@@ -32,7 +32,7 @@ const StatsNode = ({ stream, dataRef }) => {
   const [windowVal,  setWindowVal]  = useState(1);
   const [windowUnit, setWindowUnit] = useState('s');  // 'ms' | 's' | 'min' | 'samples'
 
-  const calcSamples = () => Math.min(
+  const nSamples = useMemo(() => Math.min(
     Math.max(1,
       windowUnit === 'samples' ? Math.round(windowVal) :
       windowUnit === 'ms'      ? Math.round(windowVal / 1000 * rate) :
@@ -40,23 +40,20 @@ const StatsNode = ({ stream, dataRef }) => {
       /* 's' */                  Math.round(windowVal * rate)
     ),
     MAX_SAMPLES
-  );
+  ), [windowUnit, windowVal, rate]);
 
   const [rows, setRows] = useState(null);
-  const [nSamples, setNSamples] = useState(calcSamples);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    const n = calcSamples();
-    setNSamples(n);
     const update = () => {
       const packets = dataRef.current?.[stream.name] ?? [];
-      setRows(computeStats(packets, nCh, n));
+      setRows(computeStats(packets, nCh, nSamples));
     };
     update();
     timerRef.current = setInterval(update, 250);
     return () => clearInterval(timerRef.current);
-  }, [stream, dataRef, nCh, windowVal, windowUnit, rate]);
+  }, [stream, dataRef, nCh, nSamples]);
 
   return (
     <div className="flex flex-col h-full">

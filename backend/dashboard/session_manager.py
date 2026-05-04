@@ -10,7 +10,6 @@ import logging
 import openpyxl
 import struct
 import threading
-import time
 
 from pylsl import StreamInlet, resolve_streams
 from pathlib import Path

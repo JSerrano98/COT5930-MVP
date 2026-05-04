@@ -1,6 +1,3 @@
-const getModelsDir = () =>
-  localStorage.getItem('echo_models_dir') || 'backend/ml_models';
-
 /**
  * MLIntake - Step 1 of the ML workflow.
  * User picks: dataset and task type. Save directory comes from Settings.

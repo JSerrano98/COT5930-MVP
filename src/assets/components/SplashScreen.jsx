@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const FADE_MS = 400;
 
@@ -15,13 +15,13 @@ const SplashScreen = ({ onReady }) => {
   const [fading, setFading] = useState(false);
   const doneRef = useRef(false);
 
-  const finish = () => {
+  const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
     setStatus('Ready');
     setFading(true);
     setTimeout(onReady, FADE_MS);
-  };
+  }, [onReady]);
 
   useEffect(() => {
     if (!window.echo?.getStartupStatus) {
@@ -42,7 +42,7 @@ const SplashScreen = ({ onReady }) => {
         if (nowDone) finish();
       });
     });
-  }, []);
+  }, [finish]);
 
   return (
     <div

@@ -1,20 +1,11 @@
 
-
-
-
-
-
-
-
-import sys
-
-
 import logging
 import pickle
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from dashboard.session_manager import SessionManager
 from machine_learning.router import router as ml_router
@@ -23,9 +14,6 @@ from sensors.dummy.csv_replay import CSVReplaySensor
 import os
 import numpy as np
 import pandas as pd
-
-
-STORAGE_PATH = os.path.join(os.environ.get('APP_USER_DATA', os.path.dirname(__file__)), 'data', 'CSV')
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 session = SessionManager()
@@ -79,8 +67,6 @@ def list_streams():
 def refresh_streams():
     return session.refresh()
 
-from pydantic import BaseModel
-
 class RecordStartRequest(BaseModel):
     file_path: str | None = None
     format: str = "csv"  # "csv" or "xlsx"
@@ -106,43 +92,6 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         session.remove_client(ws)
 
-
-
-
-@app.get('/replay')
-def replay():
-     return {"ok": True, "status": 'success'}
-
-
-@app.get('/CSV/')
-def list_files():
-    print('help')
-    try:
-        files = os.listdir(STORAGE_PATH)
-        return files
-    except FileNotFoundError:
-        return {"error": "Directory not found"}, 404
-
-
-@app.get('/ML/')
-async def read_user_item(file: str):
-    print(file)
-    try:
-        
-        df = pd.read_csv(STORAGE_PATH + '/'  + file )
-        columns = df.columns.to_list()
-        return columns
-    except:
-        print('test for multiple file types')
-    try:
-        df = pd.read_excel(STORAGE_PATH + '/' + file)
-        columns = df.columns.to_list()
-        return columns
-    except:
-        return {"error": "Invalid file type"}, 400
-
-
-
 _ml_sensors: dict[str, MLPredictionSensor] = {}
 _csv_replays: dict[str, dict] = {}
 _ml_model_cache: dict[str, dict] = {}  # resolved_path → loaded bundle
@@ -152,13 +101,13 @@ class MLSensorStartRequest(BaseModel):
     uid: str
     name: str
     source_name: str = ""
-    source_names: list[str] = []
+    source_names: list[str] = Field(default_factory=list)
     model_path: str
     source_type: str = ""
     buffer_seconds: float = 2.0
     process_interval: float = 0.1
     sample_rate: float = 0.0   # 0 = irregular (predict-on-demand)
-    feature_aliases: dict[str, str] = {}
+    feature_aliases: dict[str, str] = Field(default_factory=dict)
 
 
 def _resolve_model_path(path: str) -> str:
@@ -201,7 +150,7 @@ class CSVReplayStartRequest(BaseModel):
     name: str
     csv_path: str
     timestamp_column: str = "timestamp"
-    channel_labels: list[str] = []
+    channel_labels: list[str] = Field(default_factory=list)
     loop: bool = False
     use_csv_timing: bool = True
     time_scale: float = 1.0

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
 const WINDOW_S     = 5;
 const SCALE_FRAMES = 45;
@@ -9,7 +9,7 @@ const WaveformNode = ({ stream, dataRef, lineColor }) => {
   const rafRef       = useRef(null);
 
   const nCh = stream?.channels ?? 0;
-  const labels = stream?.channel_labels ?? [];
+  const labels = useMemo(() => stream?.channel_labels ?? [], [stream?.channel_labels]);
 
   const enabledRef = useRef(new Set(Array.from({ length: nCh }, (_, i) => i)));
 
