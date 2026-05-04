@@ -11,7 +11,7 @@ const MLIntake = ({ intake, onChange, onContinue }) => {
       defaultPath: intake.datasetPath || undefined,
       filters: [{ name: 'CSV Datasets', extensions: ['csv'] }, { name: 'All Files', extensions: ['*'] }],
     });
-    if (picked) onChange({ datasetPath: picked });
+    if (picked) onChange({ datasetPath: picked, resetSession: true });
   };
 
   const canContinue = intake.datasetPath.trim() && intake.taskType;
@@ -35,7 +35,7 @@ const MLIntake = ({ intake, onChange, onContinue }) => {
           <div className="flex gap-1">
             <input
               value={intake.datasetPath}
-              onChange={(e) => onChange({ datasetPath: e.target.value })}
+              onChange={(e) => onChange({ datasetPath: e.target.value, resetSession: true })}
               placeholder="path/to/dataset.csv"
               className="flex-1 bg-echo-surface-2 border border-echo-border text-white px-3 py-2 text-sm focus:border-echo-green font-body"
             />

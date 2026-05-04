@@ -21,10 +21,11 @@ from machine_learning.router import router as ml_router
 from sensors.ml_sensor import MLPredictionSensor
 from sensors.dummy.csv_replay import CSVReplaySensor
 import os
+import numpy as np
 import pandas as pd
 
 
-STORAGE_PATH = './data/CSV'
+STORAGE_PATH = os.path.join(os.environ.get('APP_USER_DATA', os.path.dirname(__file__)), 'data', 'CSV')
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 session = SessionManager()
@@ -144,6 +145,7 @@ async def read_user_item(file: str):
 
 _ml_sensors: dict[str, MLPredictionSensor] = {}
 _csv_replays: dict[str, dict] = {}
+_ml_model_cache: dict[str, dict] = {}  # resolved_path → loaded bundle
 
 
 class MLSensorStartRequest(BaseModel):
@@ -362,6 +364,52 @@ def stop_csv_replay(uid: str):
         logging.warning(f"Failed to refresh session after CSV replay stop: {exc}")
 
     return {"ok": True, "uid": uid, "saved_to": state.get("saved_to")}
+
+
+class MLInferRequest(BaseModel):
+    model_path: str
+    features: list[float]
+
+
+@app.post("/ml-sensors/infer")
+def infer_ml_sensor(req: MLInferRequest):
+    """Run a single inference from a pre-assembled feature vector.
+
+    The frontend assembles features directly from its dataRef (the same stream
+    data the session recorder uses), so the backend only needs to load the model
+    and run predict — no LSL inlets required here.
+    """
+    resolved = _resolve_model_path(req.model_path)
+    if resolved not in _ml_model_cache:
+        if not os.path.exists(resolved):
+            raise HTTPException(status_code=404, detail=f"Model file not found: {resolved}")
+        try:
+            with open(resolved, "rb") as f:
+                _ml_model_cache[resolved] = pickle.load(f)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to load model: {exc}") from exc
+
+    bundle = _ml_model_cache[resolved]
+    model = bundle["model"]
+    task = str(bundle.get("task", "regression")).strip().lower()
+    feature_cols = [str(c) for c in (bundle.get("feature_cols", []) or [])]
+    has_proba = task == "classification" and hasattr(model, "predict_proba")
+
+    features = np.asarray(req.features, dtype=float)
+    if feature_cols and len(feature_cols) == len(features):
+        X = pd.DataFrame([features], columns=feature_cols)
+    else:
+        X = features.reshape(1, -1)
+
+    try:
+        prediction = float(model.predict(X)[0])
+        result: dict = {"ok": True, "prediction": prediction}
+        if has_proba:
+            proba = model.predict_proba(X)[0]
+            result["confidence"] = float(np.max(proba))
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Inference failed: {exc}") from exc
 
 
 @app.post("/ml-sensors/start")

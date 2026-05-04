@@ -1,25 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import MLIntake from './MLIntake';
 import MLClean from './MLClean';
+import MLPrepare, { DEFAULT_PREPARE } from './MLPrepare';
 
 const BACKEND = 'http://localhost:8000';
 
 const ML_STATE_KEY = 'echo_ml_state';
+const ML_PREPARE_KEY = 'echo_ml_prepare';
+const CLEAN_CACHE_KEY = 'echo_ml_clean_cache';
 const WORKBENCH_MODELS_KEY = 'echo_ml_workbench_models';
 const WORKBENCH_STATE_KEY = 'echo_ml_workbench_state';
 
-const readJSON = (key, fallback = {}) => {
-  try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
+const readJSON = (storage, key, fallback = {}) => {
+  try { return JSON.parse(storage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; }
 };
 
 const readMLState = () => {
-  return readJSON(ML_STATE_KEY, {});
+  return readJSON(sessionStorage, ML_STATE_KEY, {});
 };
 
-const readWorkbenchModels = () => readJSON(WORKBENCH_MODELS_KEY, {});
+const readWorkbenchModels = () => readJSON(localStorage, WORKBENCH_MODELS_KEY, {});
 
 const readWorkbenchState = (datasetPath, taskType) => {
-  const state = readJSON(WORKBENCH_STATE_KEY, {});
+  const state = readJSON(sessionStorage, WORKBENCH_STATE_KEY, {});
   if (state.datasetPath === datasetPath && state.taskType === taskType) return state;
   return null;
 };
@@ -212,6 +215,16 @@ const MLTrainForm = ({ intake, onBack }) => {
         params,
         save_dir: localStorage.getItem('echo_models_dir') || 'backend/ml_models',
         ...split,
+        // Prepare step settings
+        scaler: intake.prepare?.scaler ?? 'none',
+        poly_degree: intake.prepare?.polyDegree ?? 1,
+        log_transform_cols: intake.prepare?.logTransformCols ?? [],
+        sqrt_transform_cols: intake.prepare?.sqrtTransformCols ?? [],
+        feature_selection: intake.prepare?.featureSelection ?? 'none',
+        feature_selection_k: intake.prepare?.kBestK ?? 10,
+        variance_threshold: intake.prepare?.varianceThreshold ?? 0.0,
+        correlation_threshold: intake.prepare?.correlationThreshold ?? 0.95,
+        feature_cols: intake.prepare?.featureSelection === 'manual' ? (intake.prepare?.selectedCols ?? []) : [],
       };
       const res  = await fetch(`${BACKEND}/ml/workbench/train`, {
         method: 'POST',
@@ -221,6 +234,8 @@ const MLTrainForm = ({ intake, onBack }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? 'Training failed');
       setResult(data);
+      // Clear the clean cache — model is trained, dataset session is done
+      try { localStorage.removeItem(CLEAN_CACHE_KEY); } catch { /* ignore */ }
     } catch (err) {
       setError(String(err.message ?? err));
     } finally {
@@ -416,17 +431,54 @@ const DEFAULT_INTAKE = { datasetPath: '', taskType: '', modelName: '' };
 
 const MachineLearning = () => {
   const [intake, setIntake] = useState(() => readMLState().intake  ?? DEFAULT_INTAKE);
+  const [prepare, setPrepare] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(ML_PREPARE_KEY) ?? 'null') ?? { ...DEFAULT_PREPARE }; } catch { return { ...DEFAULT_PREPARE }; }
+  });
   const [step, setStep]     = useState(() => {
     const saved = readMLState();
     const ok = saved.intake?.datasetPath?.trim() && saved.intake?.taskType?.trim();
     return ok ? (saved.step ?? 'intake') : 'intake';
   });
 
-  const handleIntakeChange = (patch) => setIntake((prev) => ({ ...prev, ...patch }));
+  useEffect(() => {
+    // One-time migration: wipe any ML state that was previously stored in localStorage
+    // (CLEAN_CACHE_KEY intentionally kept — it persists until new file or training)
+    try { localStorage.removeItem(ML_STATE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(ML_PREPARE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(WORKBENCH_STATE_KEY); } catch { /* ignore */ }
+  }, []);
+
+  const clearDatasetScopedState = () => {
+    try { localStorage.removeItem(CLEAN_CACHE_KEY); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(WORKBENCH_STATE_KEY); } catch { /* ignore */ }
+    setPrepare({ ...DEFAULT_PREPARE });
+  };
+
+  const handleIntakeChange = (patch) => {
+    const { resetSession = false, ...nextPatch } = patch;
+    const datasetChanged = Object.prototype.hasOwnProperty.call(nextPatch, 'datasetPath')
+      && nextPatch.datasetPath
+      && nextPatch.datasetPath !== intake.datasetPath;
+
+    if (resetSession && datasetChanged) {
+      clearDatasetScopedState();
+      setStep('clean');
+    }
+
+    setIntake((prev) => ({ ...prev, ...nextPatch }));
+  };
+  const handlePrepareChange = (next) => setPrepare(next);
 
   useEffect(() => {
-    try { localStorage.setItem(ML_STATE_KEY, JSON.stringify({ step, intake })); } catch { /* quota */ }
+    try { sessionStorage.setItem(ML_STATE_KEY, JSON.stringify({ step, intake })); } catch { /* quota */ }
   }, [step, intake]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(ML_PREPARE_KEY, JSON.stringify(prepare)); } catch { /* quota */ }
+  }, [prepare]);
+
+  // Attach prepare to intake so MLTrainForm can read it from one prop
+  const intakeWithPrepare = { ...intake, prepare };
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -439,11 +491,20 @@ const MachineLearning = () => {
             intake={intake}
             onIntakeChange={handleIntakeChange}
             onBack={() => setStep('intake')}
+            onContinue={() => setStep('prepare')}
+          />
+        )}
+        {step === 'prepare' && (
+          <MLPrepare
+            intake={intake}
+            prepare={prepare}
+            onPrepareChange={handlePrepareChange}
+            onBack={() => setStep('clean')}
             onContinue={() => setStep('configure')}
           />
         )}
         {step === 'configure' && (
-          <MLTrainForm intake={intake} onBack={() => setStep('clean')} />
+          <MLTrainForm intake={intakeWithPrepare} onBack={() => setStep('prepare')} />
         )}
       </div>
     </div>

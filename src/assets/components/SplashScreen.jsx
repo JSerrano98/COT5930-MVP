@@ -24,13 +24,23 @@ const SplashScreen = ({ onReady }) => {
   };
 
   useEffect(() => {
+    if (!window.echo?.getStartupStatus) {
+      // Not running in Electron — skip immediately
+      finish();
+      return;
+    }
     window.echo.getStartupStatus().then(({ done }) => {
       if (done) {
         finish();
         return;
       }
+      // Register listeners then re-check status to close the race window where
+      // startup:ready fires between the first check and listener registration.
       window.echo.onStartupStatus((msg) => setStatus(msg));
       window.echo.onStartupReady(() => finish());
+      window.echo.getStartupStatus().then(({ done: nowDone }) => {
+        if (nowDone) finish();
+      });
     });
   }, []);
 

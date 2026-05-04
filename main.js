@@ -13,6 +13,7 @@ const preload = path.join(__dirname, 'preload.cjs')
 const backendDir = path.join(__dirname, 'backend')
 
 let win = null
+let splashWin = null
 let backendProc = null
 let sessionRunning = false
 let startupDone = false   // prevent re-running startup on HMR reloads
@@ -21,7 +22,7 @@ let startupDone = false   // prevent re-running startup on HMR reloads
 // =========================
 
 function sendStartupStatus(msg) {
-  win?.webContents?.send('startup:status', msg)
+  splashWin?.webContents?.send('splash:status', msg)
 }
 
 async function waitForBackend(retries = 40, delayMs = 500) {
@@ -71,10 +72,24 @@ async function runStartup() {
 function startBackend() {
   if (backendProc) return
 
-  const python = process.platform === 'win32' ? 'python' : 'python3'
-  backendProc = spawn(python, ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '8000'], {
-    cwd: backendDir,
-    env: { ...process.env },
+  let cmd, args, cwd
+  if (isDev) {
+    const python = process.platform === 'win32' ? 'python' : 'python3'
+    cmd  = python
+    args = ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '8000']
+    cwd  = backendDir
+  } else {
+    const ext = process.platform === 'win32' ? '.exe' : ''
+    cmd  = path.join(process.resourcesPath, 'backend', 'session', `session${ext}`)
+    args = []
+    cwd  = path.join(process.resourcesPath, 'backend', 'session')
+  }
+
+  const userDataDir = app.getPath('userData')
+
+  backendProc = spawn(cmd, args, {
+    cwd,
+    env: { ...process.env, APP_USER_DATA: userDataDir },
   })
 
   const sendLog = (line) => {
@@ -313,69 +328,34 @@ ipcMain.handle('recording:stop', async () => {
 
 const VITE_URL = 'http://localhost:5173'
 
-function buildNativeSplashHtml() {
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>ECHO</title>
-    <style>
-      :root { color-scheme: light; }
-      html, body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        background: #f5f5f4;
-      }
-      body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: "Segoe UI", Arial, sans-serif;
-      }
-      .wrap {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      .title {
-        margin: 0;
-        font-size: 88px;
-        letter-spacing: 0.08em;
-        color: #1c1917;
-        font-family: "Bebas Neue", Impact, sans-serif;
-      }
-      .subtitle {
-        margin: 4px 0 22px;
-        font-size: 11px;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: #78716c;
-      }
-      .spinner {
-        width: 34px;
-        height: 34px;
-        border: 2px solid rgba(255, 122, 0, 0.25);
-        border-top-color: #FF7A00;
-        border-radius: 9999px;
-        animation: spin 0.8s linear infinite;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div class="wrap">
-      <h1 class="title">ECHO</h1>
-      <p class="subtitle">Enhanced Cognitive Human Operations</p>
-      <div class="spinner"></div>
-    </div>
-  </body>
-</html>`
+function createSplashWindow() {
+  splashWin = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    backgroundColor: '#1c1917',
+    frame: false,
+    icon: path.join(__dirname, 'public', 'favicon.ico'),
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  })
+  const splashPath = isDev
+    ? path.join(__dirname, 'public', 'splash.html')
+    : path.join(__dirname, 'dist', 'splash.html')
+  splashWin.loadFile(splashPath)
+}
+
+function createMainWindow() {
+  win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    backgroundColor: '#1c1917',
+    show: false,
+    icon: path.join(__dirname, 'public', 'favicon.ico'),
+    webPreferences: {
+      preload,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
 }
 
 function loadRenderer() {
@@ -393,36 +373,40 @@ function loadRenderer() {
   }
 }
 
-const createWindow = () => {
-  win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    backgroundColor: '#f5f5f4',
-    icon: path.join(__dirname, 'public', 'favicon.ico'),
-    webPreferences: {
-      preload,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  })
-
-  const splashHtml = buildNativeSplashHtml()
-  win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`)
+function dismissSplash() {
+  if (!splashWin || splashWin.isDestroyed()) return
+  splashWin.close()
+  splashWin = null
 }
 
 app.whenReady().then(() => {
   buildMenu()
-  startBackend()   // start backend immediately - no need to wait for window
-  createWindow()
-  runStartup().finally(() => loadRenderer())
+  startBackend()
+
+  // Splash shows immediately; main window loads React hidden in background.
+  // When BOTH startup is done AND React has painted its first frame, swap them.
+  createSplashWindow()
+  createMainWindow()
+  loadRenderer()
+
+  const reactReady = new Promise(resolve => win.once('ready-to-show', resolve))
+
+  Promise.all([runStartup(), reactReady]).then(() => {
+    dismissSplash()
+    win.show()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      createMainWindow()
+      loadRenderer()
       if (startupDone) {
-        loadRenderer()
+        win.show()
       } else {
-        runStartup().finally(() => loadRenderer())
+        Promise.all([
+          runStartup(),
+          new Promise(resolve => win.once('ready-to-show', resolve)),
+        ]).then(() => win.show())
       }
     }
   })

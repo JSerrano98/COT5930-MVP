@@ -12,7 +12,10 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ml_models")
+MODELS_DIR = os.path.join(
+    os.environ.get('APP_USER_DATA') or os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "ml_models",
+)
 
 
 def _ensure_models_dir():

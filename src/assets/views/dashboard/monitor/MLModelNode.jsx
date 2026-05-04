@@ -20,50 +20,15 @@ const objectsEqual = (a = {}, b = {}) => {
 const normalizeFeatureKey = (value = '') => String(value).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [metaBusy, setMetaBusy] = useState(false);
   const [modelMeta, setModelMeta] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
-  const [latestPacket, setLatestPacket] = useState(null);
-  const lastPacketMarkerRef = useRef(null);
+  const [inferResult, setInferResult] = useState(null);
+  const [debugFeatures, setDebugFeatures] = useState(null);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const inferBusyRef = useRef(false);
 
-  const streamName = monitor.stream?.name;
-  useEffect(() => {
-    if (!streamName) {
-      setLatestPacket(null);
-      lastPacketMarkerRef.current = null;
-      return;
-    }
-
-    const syncLatest = () => {
-      const pkts = dataRef?.current?.[streamName] ?? [];
-      const pkt = pkts.length ? pkts[pkts.length - 1] : null;
-      const marker = pkt ? `${pkt.receiveTime ?? ''}_${pkt.timestamp ?? ''}_${pkts.length}` : null;
-      if (marker !== lastPacketMarkerRef.current) {
-        lastPacketMarkerRef.current = marker;
-        setLatestPacket(pkt);
-      }
-    };
-
-    syncLatest();
-    const id = setInterval(syncLatest, 120);
-    return () => clearInterval(id);
-  }, [dataRef, streamName]);
-
-  const sample = latestPacket?.data ?? [];
-  const prediction = sample[0];
-  const confidence = sample[1];
-  const modelStream = monitor.stream;
-  const hasConfidence = Array.isArray(modelStream?.channel_labels)
-    ? modelStream.channel_labels.includes('confidence')
-    : Number(modelStream?.channels || 0) > 1;
-  const formattedPrediction = Number.isFinite(Number(prediction))
-    ? Number(prediction).toFixed(4)
-    : (prediction ?? '--');
-  const formattedConfidence = Number.isFinite(Number(confidence))
-    ? `${(Number(confidence) * 100).toFixed(1)}%`
-    : '--';
   const selectedSourceNames = Array.isArray(monitor.sourceNames)
     ? monitor.sourceNames
     : (monitor.sourceName ? [monitor.sourceName] : []);
@@ -80,6 +45,7 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
       labels.forEach((label, idx) => {
         out.push({
           id: `${s.name}::${idx}`,
+          channelIdx: idx,
           streamName: s.name,
           label,
           lookup: `${s.name}::${label}`,
@@ -176,12 +142,14 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     return modelMeta.feature_cols.filter((f) => !isFeatureMatched[f]);
   }, [modelMeta, isFeatureMatched]);
 
+  // Load model metadata when path changes. Keep it loaded while running so inference can use feature_cols.
   useEffect(() => {
     const path = (monitor.modelPath || '').trim();
-    if (!path || monitor.running) {
+    if (!path) {
       setModelMeta(null);
       return;
     }
+    if (monitor.running) return;
 
     let cancelled = false;
     const run = async () => {
@@ -210,6 +178,7 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     };
   }, [monitor.modelPath, monitor.running]);
 
+  // Auto-suggest source names and clean stale manual aliases when not running.
   useEffect(() => {
     if (!modelMeta?.feature_cols?.length || monitor.running) return;
 
@@ -248,6 +217,80 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     backendKeySet,
   ]);
 
+  // Inference loop: reads the same stream data the session recorder uses (via dataRef),
+  // assembles the feature vector, and POSTs to /ml-sensors/infer.
+  useEffect(() => {
+    if (!monitor.running || !modelMeta?.feature_cols?.length) {
+      setInferResult(null);
+      return;
+    }
+
+    const channelByLookup = new Map(availableChannels.map((ch) => [ch.lookup, ch]));
+
+    const runInfer = async () => {
+      if (inferBusyRef.current) return;
+
+      const features = [];
+      const snapshot = [];
+      for (const feature of modelMeta.feature_cols) {
+        const lookup = validEffectiveAliases[feature];
+        if (!lookup) {
+          snapshot.push({ feature, lookup: null, channel: null, value: null, error: 'no alias' });
+          return;
+        }
+
+        const ch = channelByLookup.get(lookup);
+        if (!ch) {
+          snapshot.push({ feature, lookup, channel: null, value: null, error: 'channel not found' });
+          return;
+        }
+
+        const packets = dataRef?.current?.[ch.streamName] ?? [];
+        const latest = packets[packets.length - 1];
+        if (!latest?.data) {
+          snapshot.push({ feature, lookup, channel: ch.display, value: null, error: 'no data' });
+          return;
+        }
+
+        const val = latest.data[ch.channelIdx];
+        if (val == null) {
+          snapshot.push({ feature, lookup, channel: ch.display, value: null, error: 'null value' });
+          return;
+        }
+        snapshot.push({ feature, lookup, channel: ch.display, value: val, error: null });
+        features.push(val);
+      }
+
+      setDebugFeatures(snapshot);
+
+      if (features.length !== modelMeta.feature_cols.length) return;
+
+      inferBusyRef.current = true;
+      try {
+        const res = await fetch(`${API_URL}/ml-sensors/infer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_path: monitor.modelPath, features }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setInferResult(data);
+          setError('');
+        } else {
+          setError(data.detail ?? data.error ?? 'Inference error');
+        }
+      } catch (_) {
+        // ignore transient network errors during inference
+      } finally {
+        inferBusyRef.current = false;
+      }
+    };
+
+    runInfer();
+    const id = setInterval(runInfer, 100);
+    return () => clearInterval(id);
+  }, [monitor.running, monitor.modelPath, modelMeta, validEffectiveAliases, availableChannels, dataRef]);
+
   const pickModel = async () => {
     const defaultPath = monitor.modelPath || (await window.echo.getDefaultModelPath?.()) || undefined;
     const picked = await window.echo.pickFile({
@@ -260,8 +303,8 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
     if (picked) onPatch({ modelPath: picked, sensorName: modelNameFromPath(picked) });
   };
 
-  const startModelSensor = async () => {
-    if (monitor.running || busy) return;
+  const startModelSensor = () => {
+    if (monitor.running) return;
 
     if (!monitor.modelPath?.trim()) {
       setError('Choose a model file first.');
@@ -286,77 +329,29 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
       return;
     }
 
-    if (selectedSourceNames.length === 0) {
-      onPatch({ sourceNames: requestedSources, sourceName: requestedSources[0] || '' });
-    }
-
-    setBusy(true);
     setError('');
-
-    try {
-      const sensorUid = monitor.sensorUid || `ml_${monitor.id}`;
-      const sensorName = modelNameFromPath(monitor.modelPath);
-
-      const payload = {
-        uid: sensorUid,
-        name: sensorName,
-        source_name: requestedSources[0],
-        source_names: requestedSources,
-        source_type: monitor.sourceType || '',
-        model_path: monitor.modelPath,
-        buffer_seconds: monitor.bufferSeconds ?? 2.0,
-        process_interval: monitor.processInterval ?? 0.1,
-        feature_aliases: validEffectiveAliases,
-      };
-
-      const res = await fetch(`${API_URL}/ml-sensors/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.detail ?? data.error ?? 'Failed to start ML sensor');
-      }
-
-      onPatch({
-        sensorUid,
-        sensorName,
-        sourceNames: requestedSources,
-        featureAliases: validEffectiveAliases,
-        running: true,
-        stream: data.stream || {
-          name: sensorName,
-          type: 'ML',
-          channels: 1,
-          rate: 0,
-          channel_labels: ['prediction'],
-        },
-      });
-    } catch (e) {
-      setError(String(e.message ?? e));
-    } finally {
-      setBusy(false);
-    }
+    const sensorName = modelNameFromPath(monitor.modelPath);
+    onPatch({
+      running: true,
+      sensorName,
+      sourceNames: requestedSources,
+      sourceName: requestedSources[0] || '',
+      featureAliases: validEffectiveAliases,
+    });
   };
 
-  const stopModelSensor = async () => {
-    if (!monitor.sensorUid) {
-      onPatch({ running: false });
-      return;
-    }
-
-    setBusy(true);
-    setError('');
-    try {
-      await fetch(`${API_URL}/ml-sensors/${monitor.sensorUid}`, { method: 'DELETE' });
-      onPatch({ running: false, stream: null });
-    } catch (e) {
-      setError(String(e.message ?? e));
-    } finally {
-      setBusy(false);
-    }
+  const stopModelSensor = () => {
+    setInferResult(null);
+    setDebugFeatures(null);
+    onPatch({ running: false, stream: null });
   };
+
+  const formattedPrediction = Number.isFinite(Number(inferResult?.prediction))
+    ? Number(inferResult.prediction).toFixed(4)
+    : (inferResult?.prediction ?? '--');
+  const formattedConfidence = Number.isFinite(Number(inferResult?.confidence))
+    ? `${(Number(inferResult.confidence) * 100).toFixed(1)}%`
+    : null;
 
   return (
     <div
@@ -499,17 +494,17 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
           <div className="flex gap-1 pt-1">
             <button
               onClick={startModelSensor}
-              disabled={busy || metaBusy}
+              disabled={metaBusy}
               className="flex-1 border border-echo-green/60 bg-echo-green/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-echo-green hover:bg-echo-green/20 disabled:opacity-50"
             >
-              {busy ? 'STARTING…' : 'START MODEL'}
+              START MODEL
             </button>
           </div>
         )}
 
         {error && <p className="text-[10px] text-red-400">{error}</p>}
 
-        {monitor.running && modelStream && (
+        {monitor.running && (
           <>
             <div className="mt-1 grid grid-cols-2 gap-2">
               <div className="border border-echo-border bg-echo-surface-2 px-2 py-2">
@@ -518,21 +513,47 @@ const MLModelNode = ({ monitor, streams = [], dataRef, onPatch }) => {
               </div>
               <div className="border border-echo-border bg-echo-surface-2 px-2 py-2">
                 <p className="text-[9px] uppercase tracking-widest text-echo-dim">Confidence</p>
-                <p className="mt-1 font-mono text-xl text-white">{hasConfidence ? formattedConfidence : 'N/A'}</p>
+                <p className="mt-1 font-mono text-xl text-white">{formattedConfidence ?? 'N/A'}</p>
               </div>
             </div>
 
             <div className="border border-echo-border bg-echo-surface-2 px-2 py-1 text-[10px] text-echo-muted">
-              <p>Stream: <span className="font-mono text-white">{modelStream.name}</span></p>
-              <p>Rate: <span className="font-mono text-white">{modelStream.rate || 0} Hz</span></p>
+              <p>Model: <span className="font-mono text-white">{modelNameFromPath(monitor.modelPath)}</span></p>
+              <p>Sources: <span className="font-mono text-white">{selectedSourceNames.join(', ') || '--'}</span></p>
+            </div>
+
+            <div className="rounded border border-echo-border bg-echo-surface-2 px-2 py-1">
+              <button
+                type="button"
+                onClick={() => setDebugOpen((v) => !v)}
+                className="w-full text-left text-[9px] font-mono uppercase tracking-widest text-echo-muted hover:text-white"
+              >
+                {debugOpen ? '▾ Hide Features' : '▸ Inspect Features'}
+              </button>
+              {debugOpen && (
+                <div className="mt-1 max-h-40 space-y-0.5 overflow-auto">
+                  {debugFeatures
+                    ? debugFeatures.map((f) => (
+                        <div key={f.feature} className="flex items-center gap-1 text-[9px]">
+                          <span className="w-20 shrink-0 truncate font-mono text-echo-muted">{f.feature}</span>
+                          <span className="w-28 shrink-0 truncate text-echo-dim">{f.channel ?? '—'}</span>
+                          {f.error
+                            ? <span className="font-mono text-red-400">{f.error}</span>
+                            : <span className="font-mono text-echo-green">{Number(f.value).toFixed(4)}</span>
+                          }
+                        </div>
+                      ))
+                    : <p className="text-[9px] text-echo-muted">Waiting for first inference...</p>
+                  }
+                </div>
+              )}
             </div>
 
             <button
               onClick={stopModelSensor}
-              disabled={busy}
-              className="w-full border border-red-500/60 bg-red-500/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+              className="w-full border border-red-500/60 bg-red-500/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-red-300 hover:bg-red-500/20"
             >
-              {busy ? 'STOPPING…' : 'STOP MODEL'}
+              STOP MODEL
             </button>
           </>
         )}

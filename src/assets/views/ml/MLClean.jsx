@@ -62,7 +62,7 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
   const [bulkAction, setBulkAction]         = useState('fill_mean');
   const [applying, setApplying]             = useState(false);
   const [cleanResult, setCleanResult]       = useState(() => loadCleanCache(intake.datasetPath)?.cleanResult ?? null);
-  const [profileProgress, setProfileProgress] = useState({ pct: 0, label: '' });
+
   const [applyProgress, setApplyProgress]     = useState({ pct: 0, label: '' });
 
   useEffect(() => {
@@ -79,7 +79,7 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
 
     let cancelled = false;
     setLoading(true);
-    setProfileProgress({ pct: 0, label: 'Starting…' });
+
     setError('');
     setProfile(null);
     setOps({});
@@ -87,36 +87,19 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
 
     (async () => {
       try {
-        const res = await fetch(`${BACKEND}/ml/workbench/profile/stream`, {
+        const res = await fetch(`${BACKEND}/ml/workbench/profile`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataset_path: intake.datasetPath }),
         });
-        if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const evt = JSON.parse(line.slice(6));
-            if (cancelled) return;
-            if (evt.error) throw new Error(evt.error);
-            setProfileProgress({ pct: evt.pct, label: evt.label });
-            if (evt.result !== undefined) {
-              const data = evt.result;
-              setProfile(data);
-              const defaults = {};
-              (data.columns ?? []).forEach((c) => { defaults[c.name] = 'keep'; });
-              setOps(defaults);
-            }
-          }
-        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail ?? `Server error ${res.status}`);
+        if (cancelled) return;
+
+        setProfile(data);
+        const defaults = {};
+        (data.columns ?? []).forEach((c) => { defaults[c.name] = 'keep'; });
+        setOps(defaults);
       } catch (e) {
         if (!cancelled) setError(String(e.message ?? e));
       } finally {
@@ -155,7 +138,7 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
         .filter(([, action]) => action !== 'keep')
         .map(([col, action]) => ({ col, action }));
 
-      const res = await fetch(`${BACKEND}/ml/workbench/clean/stream`, {
+      const res = await fetch(`${BACKEND}/ml/workbench/clean`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,27 +148,11 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
           clean_dir: localStorage.getItem('echo_cleaned_dir') || '',
         }),
       });
-      if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const evt = JSON.parse(line.slice(6));
-          if (evt.error) throw new Error(evt.error);
-          setApplyProgress({ pct: evt.pct, label: evt.label });
-          if (evt.result !== undefined) {
-            onIntakeChange({ datasetPath: evt.result.cleaned_path });
-            setCleanResult(evt.result);
-          }
-        }
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? `Server error ${res.status}`);
+      setApplyProgress({ pct: 100, label: 'Cleaning complete' });
+      onIntakeChange({ datasetPath: data.cleaned_path });
+      setCleanResult(data);
     } catch (e) {
       setError(String(e.message ?? e));
     } finally {
@@ -246,11 +213,31 @@ const MLClean = ({ intake, onIntakeChange, onBack, onContinue }) => {
       {/* Body */}
       <div className="flex-1 overflow-auto p-6">
         {loading && (
-          <ProgressBar pct={profileProgress.pct} label={profileProgress.label} />
+          <div className="flex flex-col items-center justify-center gap-4 py-16">
+            <svg
+              width="32" height="32" viewBox="0 0 32 32"
+              style={{ animation: 'echo-spin 0.8s linear infinite' }}
+            >
+              <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,122,0,0.25)" strokeWidth="2.5" />
+              <path d="M16 3 A13 13 0 0 1 29 16" fill="none" stroke="#FF7A00" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+            <p className="text-[10px] font-ui font-semibold uppercase tracking-widest text-echo-muted">
+              Reading dataset — large files may take a moment…
+            </p>
+          </div>
         )}
         {error && (
           <div className="mb-4 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-body">
             {error}
+          </div>
+        )}
+
+        {profile?.sampled && (
+          <div className="mb-4 flex items-center gap-2 border border-echo-border bg-echo-surface px-4 py-2">
+            <span className="text-[9px] font-ui font-semibold uppercase tracking-widest text-echo-muted">Sampled</span>
+            <span className="text-xs text-echo-dim font-body">
+              Stats are estimated from {profile.sample_rows?.toLocaleString()} of {profile.rows?.toLocaleString()} rows. Cleaning will apply to all rows.
+            </span>
           </div>
         )}
 

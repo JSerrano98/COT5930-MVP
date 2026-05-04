@@ -54,11 +54,15 @@ const TempFlowNode = ({ data }) => (
   </Monitor>
 );
 
-const MLFlowNode = ({ data }) => (
-  <Monitor stream={data.stream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
-    <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
-  </Monitor>
-);
+const MLFlowNode = ({ data }) => {
+  const modelName = data.monitor?.sensorName || null;
+  const displayStream = data.stream || (modelName ? { name: modelName } : null);
+  return (
+    <Monitor stream={displayStream} nodeType="ml" onRemove={data.onRemove} dataRef={data.dataRef}>
+      <MLModelNode monitor={data.monitor} streams={data.streams} dataRef={data.dataRef} onPatch={data.onPatch} />
+    </Monitor>
+  );
+};
 
 const CSVReplayFlowNode = ({ data }) => (
   <Monitor stream={data.stream} nodeType="csvReplay" onRemove={data.onRemove} dataRef={data.dataRef}>

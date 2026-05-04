@@ -22,6 +22,9 @@ from sklearn.metrics import (
     r2_score,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline as SkPipeline
+from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler, RobustScaler, StandardScaler, PolynomialFeatures
+from sklearn.feature_selection import SelectKBest, VarianceThreshold, f_classif, f_regression
 
 
 MODEL_SPECS: dict[str, dict[str, Any]] = {
@@ -76,6 +79,18 @@ class TrainRequest:
     val_size: float = 0.1
     random_state: int = 42
     shuffle: bool = True
+    # Scaling
+    scaler: str = "none"  # none | standard | minmax | robust | maxabs
+    # Feature engineering
+    poly_degree: int = 1
+    log_transform_cols: list = None
+    sqrt_transform_cols: list = None
+    # Feature selection
+    feature_selection: str = "none"  # none | manual | variance | kbest | correlation
+    feature_selection_k: int = 10
+    variance_threshold: float = 0.0
+    correlation_threshold: float = 0.95
+    feature_cols: list = None  # manual selection; empty/None = use all
 
 
 def _resolve_dataset_path(path: str) -> str:
@@ -92,41 +107,72 @@ def _safe_model_name(name: str, model_key: str) -> str:
     return candidate
 
 
+PROFILE_SAMPLE_ROWS = 100_000  # max rows read for profiling stats
+
+
+def _count_csv_rows(path: str) -> int:
+    """Count data rows without loading the full file into memory."""
+    count = 0
+    with open(path, "rb") as f:
+        while chunk := f.read(1 << 20):  # 1 MB chunks
+            count += chunk.count(b"\n")
+    return max(0, count - 1)  # subtract header
+
+
 def get_dataset_columns(dataset_path: str) -> dict[str, Any]:
     resolved = _resolve_dataset_path(dataset_path)
     if not os.path.exists(resolved):
         raise FileNotFoundError(f"Dataset not found: {resolved}")
 
-    df = pd.read_csv(resolved)
+    df = pd.read_csv(resolved, nrows=1)
+    total = _count_csv_rows(resolved)
     return {
         "path": resolved,
-        "rows": int(len(df)),
+        "rows": total,
         "columns": list(df.columns),
     }
 
 
 def get_dataset_profile(dataset_path: str) -> dict[str, Any]:
-    """Return per-column stats useful for data cleaning decisions."""
+    """Return per-column stats useful for data cleaning decisions.
+
+    For large files (> PROFILE_SAMPLE_ROWS) the column stats are derived
+    from a random sample; the total row count is always exact.
+    """
     resolved = _resolve_dataset_path(dataset_path)
     if not os.path.exists(resolved):
         raise FileNotFoundError(f"Dataset not found: {resolved}")
 
-    df = pd.read_csv(resolved)
-    total = len(df)
+    # Run row-count scan and data sample concurrently so they overlap on disk I/O
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_count = executor.submit(_count_csv_rows, resolved)
+        future_df = executor.submit(pd.read_csv, resolved, nrows=PROFILE_SAMPLE_ROWS)
+        df = future_df.result()
+        total = future_count.result()
+
+    sampled = total > PROFILE_SAMPLE_ROWS
+
+    sample_size = len(df)
     cols = []
     for col in df.columns:
         null_count = int(df[col].isna().sum())
+        # Scale null count back to estimated full-dataset count when sampled
+        scaled_null = round(null_count / sample_size * total) if sampled and sample_size > 0 else null_count
         cols.append({
             "name": col,
             "dtype": str(df[col].dtype),
-            "null_count": null_count,
-            "null_pct": round(null_count / total * 100, 1) if total > 0 else 0.0,
+            "null_count": scaled_null,
+            "null_pct": round(null_count / sample_size * 100, 1) if sample_size > 0 else 0.0,
             "unique_count": int(df[col].nunique()),
             "sample": [str(s) for s in df[col].dropna().head(3).tolist()],
         })
     return {
         "path": resolved,
         "rows": total,
+        "sampled": sampled,
+        "sample_rows": sample_size,
         "duplicate_rows": int(df.duplicated().sum()),
         "columns": cols,
     }
@@ -136,6 +182,7 @@ def clean_dataset(
     dataset_path: str,
     drop_duplicates: bool,
     column_ops: list[dict[str, str]],
+    clean_dir: str = '',
 ) -> dict[str, Any]:
     """Apply cleaning operations and save the result as a new _cleaned CSV."""
     resolved = _resolve_dataset_path(dataset_path)
@@ -172,8 +219,14 @@ def clean_dataset(
     if cols_to_drop:
         df = df.drop(columns=cols_to_drop)
 
-    base, ext = os.path.splitext(resolved)
-    out_path = f"{base}_cleaned{ext}"
+    base_name = os.path.splitext(os.path.basename(resolved))[0]
+    cleaned_filename = f"{base_name}_cleaned.csv"
+    if clean_dir and clean_dir.strip():
+        out_dir = os.path.abspath(clean_dir.strip())
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, cleaned_filename)
+    else:
+        out_path = os.path.join(os.path.dirname(resolved), cleaned_filename)
     df.to_csv(out_path, index=False)
 
     return {
@@ -183,6 +236,34 @@ def clean_dataset(
         "dropped_rows": original_rows - int(len(df)),
         "dropped_cols": len(cols_to_drop),
     }
+
+
+def _build_scaler(name: str):
+    return {
+        "standard": StandardScaler(),
+        "minmax": MinMaxScaler(),
+        "robust": RobustScaler(),
+        "maxabs": MaxAbsScaler(),
+    }.get(name)
+
+
+def _apply_transforms(df: pd.DataFrame, log_cols: list, sqrt_cols: list) -> pd.DataFrame:
+    df = df.copy()
+    for col in (log_cols or []):
+        if col in df.columns:
+            df[col] = np.log1p(df[col].clip(lower=0))
+    for col in (sqrt_cols or []):
+        if col in df.columns:
+            df[col] = np.sqrt(df[col].clip(lower=0))
+    return df
+
+
+def _correlation_keep_cols(df: pd.DataFrame, threshold: float) -> list:
+    """Return columns to keep after dropping one of each highly-correlated pair."""
+    corr = df.corr(numeric_only=True).abs()
+    upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+    to_drop = {col for col in upper.columns if any(upper[col] > threshold)}
+    return [c for c in df.columns if c not in to_drop]
 
 
 def _build_model(model_key: str, params: dict[str, Any]):
@@ -245,8 +326,17 @@ def train_model(req: TrainRequest, models_dir: str) -> dict[str, Any]:
     if req.label_col not in df.columns:
         raise ValueError(f"Label column '{req.label_col}' not found in dataset")
 
-    X = df.drop(columns=[req.label_col])
     y = df[req.label_col]
+
+    # 1. Manual feature column selection
+    if req.feature_cols:
+        available = [c for c in req.feature_cols if c in df.columns and c != req.label_col]
+        X = df[available]
+    else:
+        X = df.drop(columns=[req.label_col])
+
+    # 2. Per-column transforms (log1p / sqrt)
+    X = _apply_transforms(X, req.log_transform_cols, req.sqrt_transform_cols)
 
     stratify = y if spec["task"] == "classification" else None
     X_trainval, X_test, y_trainval, y_test = train_test_split(
@@ -274,31 +364,67 @@ def train_model(req: TrainRequest, models_dir: str) -> dict[str, Any]:
         X_val = pd.DataFrame(columns=X.columns)
         y_val = pd.Series(dtype=y.dtype)
 
-    model = _build_model(req.model_key, req.params)
-    model.fit(X_train, y_train)
+    # 3. Correlation-based column drop (fit on X_train to avoid leakage)
+    corr_keep_cols = None
+    if req.feature_selection == "correlation":
+        corr_keep_cols = _correlation_keep_cols(X_train, req.correlation_threshold)
+        X_train = X_train[corr_keep_cols]
+        X_val   = X_val[corr_keep_cols] if len(X_val) > 0 else X_val.reindex(columns=corr_keep_cols)
+        X_test  = X_test[corr_keep_cols]
+
+    # 4. Build sklearn Pipeline: poly → scaler → selector → model
+    steps = []
+
+    if (req.poly_degree or 1) > 1:
+        steps.append(("poly", PolynomialFeatures(degree=int(req.poly_degree), include_bias=False)))
+
+    scaler_obj = _build_scaler(req.scaler or "none")
+    if scaler_obj is not None:
+        steps.append(("scaler", scaler_obj))
+
+    if req.feature_selection == "variance":
+        steps.append(("var_sel", VarianceThreshold(threshold=float(req.variance_threshold or 0.0))))
+    elif req.feature_selection == "kbest":
+        score_func = f_classif if spec["task"] == "classification" else f_regression
+        k = min(int(req.feature_selection_k or 10), X_train.shape[1])
+        steps.append(("kbest", SelectKBest(score_func=score_func, k=k)))
+
+    base_model = _build_model(req.model_key, req.params)
+    steps.append(("model", base_model))
+
+    pipe = SkPipeline(steps)
+    pipe.fit(X_train, y_train)
 
     if spec["task"] == "classification":
-        train_metrics = _classification_metrics(model, X_train, y_train)
-        val_metrics = _classification_metrics(model, X_val, y_val)
-        test_metrics = _classification_metrics(model, X_test, y_test)
+        train_metrics = _classification_metrics(pipe, X_train, y_train)
+        val_metrics   = _classification_metrics(pipe, X_val, y_val)
+        test_metrics  = _classification_metrics(pipe, X_test, y_test)
     else:
-        train_metrics = _regression_metrics(model, X_train, y_train)
-        val_metrics = _regression_metrics(model, X_val, y_val)
-        test_metrics = _regression_metrics(model, X_test, y_test)
+        train_metrics = _regression_metrics(pipe, X_train, y_train)
+        val_metrics   = _regression_metrics(pipe, X_val, y_val)
+        test_metrics  = _regression_metrics(pipe, X_test, y_test)
 
     os.makedirs(models_dir, exist_ok=True)
     model_name = _safe_model_name(req.model_name, req.model_key)
     model_path = os.path.join(models_dir, f"{model_name}.pkl")
 
+    saved_feature_cols = corr_keep_cols if corr_keep_cols is not None else list(X_train.columns)
+
     with open(model_path, "wb") as f:
         pickle.dump(
             {
-                "model": model,
+                "model": pipe,
                 "model_key": req.model_key,
                 "task": spec["task"],
-                "feature_cols": list(X.columns),
+                "feature_cols": saved_feature_cols,
                 "label_col": req.label_col,
                 "params": req.params,
+                "scaler": req.scaler,
+                "poly_degree": req.poly_degree,
+                "log_transform_cols": req.log_transform_cols or [],
+                "sqrt_transform_cols": req.sqrt_transform_cols or [],
+                "feature_selection": req.feature_selection,
+                "corr_keep_cols": corr_keep_cols,
             },
             f,
         )
