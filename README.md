@@ -13,9 +13,9 @@
 │                                                           │
 ╰───────────────────────────────────────────────────────────╯
 ```
-**Version:** 0.1.3 - ML Pipeline Beta
+**Version:** 0.1.4
 
-**Date:** 04/19/2026
+**Date:** 05/03/2026
 
 **Facilitator:** US Army Aeromedical Research Lab (USAARL) || Operator State Monitoring Team (OSM)
 
@@ -26,6 +26,7 @@
 ## Table of Contents
 
 - [About](#about)
+- [What's New in v0.1.4](#whats-new-in-v014)
 - [What's New in v0.1.3](#whats-new-in-v013)
 - [What's New in v0.1.2](#whats-new-in-v012)
 - [Project Structure](#project-structure)
@@ -43,6 +44,45 @@
 ECHO is a real-time platform for monitoring the cognitive state of operators. It connects to physiological sensors (EEG, ECG, eye tracking, etc.) via [Lab Streaming Layer (LSL)](https://labstreaminglayer.org), displays live data on a freeform canvas dashboard, and records everything for offline analysis. Future implementations include a machine learning training and development abstraction environment for quick, easy, and intuitive development of models for research testing.
 
 The end goal of this platform is to provide the means to develop the groundwork for systems that aim to enhance operator state management, monitoring, prediction, and support.
+
+---
+
+## What's New in v0.1.4
+
+**ML Workbench — In-App Training**
+- Step-by-step ML workflow: dataset intake → data cleaning → model training, all within the app
+- Data cleaning step profiles the dataset, shows null counts and sample values per column, and supports per-column fill strategies (mean, median, mode, constant, drop) or bulk apply
+- Streaming progress bars for profile and clean operations via SSE
+- Cleaned dataset path flows automatically into the training step
+- Training form caches model selection, label column, split ratios, and results across sessions via localStorage
+- Model and column selections restore on reload; "Load columns" trigger is manual to avoid redundant fetches
+- Training button is disabled until a model and label column are confirmed
+
+**ML Model Monitor — Live Inference**
+- Dashboard monitor node that runs a trained `.pkl` model as a live LSL sensor
+- Configurable source stream selection, buffer window, and process interval
+- Feature alias editor maps model feature names to live stream channel labels
+- Validation prevents starting with incomplete feature mapping
+- Displays formatted prediction and confidence output (or N/A if confidence channel absent)
+- Stop button tears down the backend ML sensor cleanly
+
+**CSV Replay Monitor**
+- Replays a recorded CSV file as a live LSL stream on the dashboard
+- Browse to select the CSV file; replay loop posts to the backend at configured rate
+- Displays playback progress with a stop control
+
+**Dashboard Workspace Save/Load**
+- Save the current monitor layout and configuration to a JSON file
+- Load a workspace JSON to restore monitors; running ML and replay sessions are reset safely on load
+- Default workspace directory configured in Settings; browsable via native file dialog
+
+**Settings — Additional Paths**
+- Cleaned Datasets Directory setting seeds the default output path for the cleaning step
+- Dashboard Workspaces Directory setting seeds the default save/load path
+
+**Splash Screen**
+- Native Electron splash (white background) handles the startup sequence — backend boot, session start, sensor launch
+- React SplashScreen component updated with an Electron environment guard and double-check race fix so it safely no-ops outside Electron
 
 ---
 
@@ -111,46 +151,46 @@ This release replaces the grid-based layout with a fully freeform canvas and add
 
 ```
 echo/
+├── main.js
+├── preload.cjs
+├── package.json
+│
 ├── backend/
-│   ├── app.py                   
+│   ├── app.py
 │   ├── requirements.txt
 │   ├── dashboard/
-│   │   └── session_manager.py         # LSL discovery, WebSocket broadcast, recording
+│   ├── data/
+│   ├── machine_learning/
+│   │   ├── router.py
+│   │   ├── model_workbench.py
+│   │   ├── pipeline.py
+│   │   └── nodes/
 │   ├── sensors/
-│   │   ├── sensor.py                  # base class hierarchy (Physical, Derived, Dummy, ML)
-│   │   ├── start_all_sensors.py       # launch all sensors (dummy + physical + derived)
-│   │   ├── start_all_dummy.py         # launch all dummy sensors in one command
+│   │   ├── sensor.py
+│   │   ├── ml_sensor.py
+│   │   ├── start_all_sensors.py
 │   │   ├── dummy/
 │   │   ├── derived/
 │   │   ├── physical/
 │   │   └── templates/
-│   ├── machine_learning/
+│   ├── ml_models/
 │   └── utils/
 │
-├── src/                               # React + Tailwind frontend (Vite + Electron)
-│   ├── main.jsx
-│   ├── App.jsx                        
+├── src/
+│   ├── App.jsx
 │   ├── App.css
 │   └── assets/
 │       ├── components/
 │       ├── context/
+│       ├── nodes/
 │       └── views/
 │           ├── dashboard/
-│           │   ├── monitor/
-│           │   └── websocket/
-│           ├── data/
+│           │   └── monitor/
 │           ├── ml/
 │           └── settings/
 │
-├── docs/
-│   └── sensors/
-│       ├── ADDING SIMPLE SENSORS.md
-│       └── ADDING PHYSICAL SENSORS.md
-├── main.js                            # Electron main process
-├── preload.cjs                        # Electron preload
-├── vite.config.js
-├── package.json
-└── README.md
+└── docs/
+    └── sensors/
 ```
 
 ---
@@ -275,6 +315,8 @@ See the guides in `docs/sensors/` for how to add your own.
 |----------|-------------|
 | [Adding Simple Sensors](docs/sensors/ADDING%20SIMPLE%20SENSORS.md) | Guide for dummy and derived sensors |
 | [Adding Physical Sensors](docs/sensors/ADDING%20PHYSICAL%20SENSORS.md) | Guide for wrapping real hardware |
+| [Adding Non-LSL USB Devices](docs/sensors/ADDING%20NON%20LSL%20USB%20DEVICES.md) | Step-by-step guide for USB and serial devices that do not publish LSL |
+| [Adding Non-LSL Bluetooth Devices](docs/sensors/ADDING%20NON%20LSL%20BLUETOOTH%20DEVICES.md) | Step-by-step guide for Bluetooth and BLE devices that do not publish LSL |
 
 ---
 
