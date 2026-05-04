@@ -1,16 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const on = (channel, cb) => {
+  const wrapped = (_e, ...args) => cb(...args);
+  ipcRenderer.on(channel, wrapped);
+  return () => ipcRenderer.removeListener(channel, wrapped);
+};
+
 contextBridge.exposeInMainWorld('echo', {
   startSession: () => ipcRenderer.invoke('session:start'),
   stopSession: () => ipcRenderer.invoke('session:stop'),
   sessionStatus: () => ipcRenderer.invoke('session:status'),
 
   getStartupStatus: () => ipcRenderer.invoke('startup:status'),
-  onStartupStatus: (cb) => ipcRenderer.on('startup:status', (_e, msg) => cb(msg)),
-  onStartupReady: (cb) => ipcRenderer.on('startup:ready', (_e, info) => cb(info)),
+  onStartupStatus: (cb) => on('startup:status', (msg) => cb(msg)),
+  onStartupReady: (cb) => on('startup:ready', (info) => cb(info)),
 
-  onSessionStopped: (cb) => ipcRenderer.on('session:stopped', (_e, ...args) => cb(...args)),
-  onBackendLog: (cb) => ipcRenderer.on('backend:log', (_e, line) => cb(line)),
+  onSessionStopped: (cb) => on('session:stopped', (...args) => cb(...args)),
+  onBackendLog: (cb) => on('backend:log', (line) => cb(line)),
 
   runScript: (name) => ipcRenderer.invoke('scripts:run', name),
 

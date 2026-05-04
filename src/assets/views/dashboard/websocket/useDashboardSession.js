@@ -29,21 +29,43 @@ export const useDashboardSession = ({ connectWs, disconnectWs, setBackendLogs })
   useEffect(() => {
     if (!window.echo) return;
 
+    let disposed = false;
+
+    const markSessionRunning = () => {
+      if (disposed) return;
+      setSessionRunning(true);
+      setSessionStarting(false);
+      connectWs();
+    };
+
     const disposeSessionStopped = window.echo.onSessionStopped?.(() => {
       setSessionRunning(false);
       setSessionStarting(false);
       disconnectWs();
     });
 
+    const disposeStartupReady = window.echo.onStartupReady?.((info) => {
+      if (info?.sessionRunning) {
+        markSessionRunning();
+      }
+    });
+
+    window.echo.getStartupStatus?.().then(({ sessionRunning: startupRunning }) => {
+      if (startupRunning) {
+        markSessionRunning();
+      }
+    });
+
     window.echo.sessionStatus().then(({ running }) => {
       if (running) {
-        setSessionRunning(true);
-        connectWs();
+        markSessionRunning();
       }
     });
 
     return () => {
+      disposed = true;
       if (typeof disposeSessionStopped === 'function') disposeSessionStopped();
+      if (typeof disposeStartupReady === 'function') disposeStartupReady();
     };
   }, [connectWs, disconnectWs]);
 

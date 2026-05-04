@@ -34,11 +34,11 @@ const DashboardNodePanel = ({ streams = [], monitors = [], onAdd, onAddModel, on
         {!collapsed && (
           <div className="flex items-center gap-2 px-3 py-2 border-b border-echo-border">
             {/* Connection dot */}
-            <span className={`echo-circle w-2 h-2 flex-shrink-0 ${connected ? 'bg-echo-blue' : 'bg-red-500'}`}
-              style={connected ? { backgroundColor: '#00C853', boxShadow: '0 0 6px #00C853' } : {}}
+            <span className={`echo-circle w-2 h-2 flex-shrink-0 ${sessionRunning ? 'bg-echo-blue' : 'bg-red-500'}`}
+              style={sessionRunning ? { backgroundColor: '#00C853', boxShadow: '0 0 6px #00C853' } : {}}
             />
             <span className="text-[9px] font-ui font-semibold tracking-widest uppercase flex-1 text-echo-muted">
-              {connected ? 'Connected' : 'No Signal'}
+              {sessionRunning ? 'Online' : 'Offline'}
             </span>
             <button
               onClick={onRefresh}
